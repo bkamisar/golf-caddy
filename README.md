@@ -37,7 +37,14 @@ Publish this repo via GitHub Desktop → repo Settings → Pages → deploy from
   slow projects (GIR), and non-problems (e.g. driving accuracy) are explicitly
   labeled so practice time isn't wasted.
 - **18-hole rounds only** feed the headline differential trend (Grint 9-hole
-  differentials aren't comparable); 9-hole rounds still count in the log.
+  differentials aren't comparable). 9-hole rounds DO feed the per-hole component
+  signals (putts, putts-vs-expected, long game), minus quarantined rows: putts/hole
+  < 1.4 for a 90s shooter is a data-entry artifact and gets flagged ⚠, not averaged.
+- **Trend = last 5 vs the previous 10** (not all-time — a 2023 round shouldn't
+  vote on whether you're improving now). The engine sorts internally and never
+  trusts paste order (stress-tested: a newest-first paste fed raw would otherwise
+  reverse every trend verdict). A course-mix caveat fires when your recent slope
+  mix diverges >6 from career.
 - Parser handles the paste's messiness: multi-line course names, names
   containing `|`, missing GIR/FIR cells (a lone % ≤30 is GIR, ≥36 is FIR,
   31–35 is dropped as ambiguous), 9/10-hole rounds.

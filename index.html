@@ -154,39 +154,55 @@ function enrich(r) {
 }
 
 function computeMetrics(rounds) {
-  const all = rounds.map(enrich);
+  // NEVER trust caller order (a newest-first paste fed directly would silently
+  // reverse every "recent vs baseline" comparison — caught in the 2026-07 stress test).
+  const sorted = [...rounds].sort((a, b) => a.date < b.date ? -1 : 1);
+  const all = sorted.map(enrich);
+  // Data-sanity quarantine: putts/hole below 1.4 for a 90s+ shooter is a
+  // data-entry artifact (e.g. an 11-putt 9-holer); keep in the log, exclude
+  // from all component signals.
+  all.forEach(r => { r.suspect = r.puttsPH < 1.4; });
   const full = all.filter(r => r.holes === 18);          // headline trend corpus
   const n = full.length;
   if (n < 3) return { all, full, enough: false };
 
   const diffs = full.map(r => r.diff);
   const sortedDiffs = [...diffs].sort((a, b) => a - b);
-  const last5  = full.slice(-5), prior = full.slice(0, -5);
+  const last5  = full.slice(-5);
+  const prev10 = full.slice(-15, -5);                    // recent baseline, not stale all-prior
   const last10 = full.slice(-10);
   const bestDecile = quantile(sortedDiffs, 0.10);
+  // Component corpus: 9-hole rounds count too (per-hole normalized), minus suspects.
+  const comp  = all.filter(r => (r.holes === 18 || r.holes === 9) && !r.suspect);
+  const comp5 = comp.slice(-5);
 
   const m = {
     all, full, enough: true, n,
+    suspectCt: all.filter(r => r.suspect).length,
     // level + distribution (never bare means — see the July 2026 putting lesson)
     medDiff: median(diffs),
     ceiling: quantile(sortedDiffs, 0.20),   // your good golf
     floor:   quantile(sortedDiffs, 0.80),   // your blowup level
     last5Med:  median(last5.map(r => r.diff)),
-    priorMed:  prior.length >= 5 ? median(prior.map(r => r.diff)) : null,
+    priorMed:  prev10.length >= 5 ? median(prev10.map(r => r.diff))
+             : (n > 5 ? median(full.slice(0, -5).map(r => r.diff)) : null),
     // career-best-decile hit rate in recent rounds (distribution-shift detector)
     bestDecileCut: bestDecile,
     recentEliteCt: last10.filter(r => r.diff <= bestDecile).length,
     recentEliteN: last10.length,
-    // component medians, last-5 vs all
-    putts5:   median(last5.map(r => r.puttsPH)),
-    puttsAll: median(full.map(r => r.puttsPH)),
-    pve5:   median(last5.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
-    pveAll: median(full.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
-    long5:   median(last5.map(r => r.longPH)),
-    longAll: median(full.map(r => r.longPH)),
-    girAll: mean(full.filter(r => r.gir !== null).map(r => r.gir)),
-    gir5:   mean(last5.filter(r => r.gir !== null).map(r => r.gir)),
-    firAll: mean(full.filter(r => r.fir !== null).map(r => r.fir)),
+    // component medians (18h + 9h, suspect rows excluded), last-5 vs all
+    putts5:   median(comp5.map(r => r.puttsPH)),
+    puttsAll: median(comp.map(r => r.puttsPH)),
+    pve5:   median(comp5.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
+    pveAll: median(comp.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
+    long5:   median(comp5.map(r => r.longPH)),
+    longAll: median(comp.map(r => r.longPH)),
+    girAll: mean(comp.filter(r => r.gir !== null).map(r => r.gir)),
+    gir5:   mean(comp5.filter(r => r.gir !== null).map(r => r.gir)),
+    firAll: mean(comp.filter(r => r.fir !== null).map(r => r.fir)),
+    // course-mix confound detector (slope of recent vs career trend corpus)
+    slope5:   mean(last5.filter(r => r.slope).map(r => r.slope)),
+    slopeAll: mean(full.filter(r => r.slope).map(r => r.slope)),
   };
 
   // ── Leak ranking (strokes per round, comparable across categories) ──
@@ -211,10 +227,14 @@ function computeMetrics(rounds) {
   if (m.priorMed !== null) {
     const d = m.last5Med - m.priorMed;
     v.push({ tone: d < -1 ? 'good' : d > 1 ? 'bad' : 'warn',
-      text: d < -1 ? `<b>Trending better:</b> last-5 median differential ${r1(m.last5Med)} vs ${r1(m.priorMed)} before — real movement, protect whatever changed.`
-           : d > 1 ? `<b>Trending worse:</b> last-5 median differential ${r1(m.last5Med)} vs ${r1(m.priorMed)} before.`
-           : `<b>Flat:</b> last-5 median ${r1(m.last5Med)} vs ${r1(m.priorMed)} baseline — no level change yet.` });
+      text: d < -1 ? `<b>Trending better:</b> last-5 median differential ${r1(m.last5Med)} vs ${r1(m.priorMed)} over the previous 10 — real movement, protect whatever changed.`
+           : d > 1 ? `<b>Trending worse:</b> last-5 median differential ${r1(m.last5Med)} vs ${r1(m.priorMed)} over the previous 10.`
+           : `<b>Flat:</b> last-5 median ${r1(m.last5Med)} vs ${r1(m.priorMed)} over the previous 10 — no level change yet.` });
+    if (m.slope5 !== null && m.slopeAll !== null && Math.abs(m.slope5 - m.slopeAll) > 6)
+      v.push({ tone: 'flat', text: `<b>Course-mix caveat:</b> your last 5 averaged slope ${Math.round(m.slope5)} vs ${Math.round(m.slopeAll)} career — the differential adjusts for that, but raw putts/GIR/FIR trends partly reflect course difficulty, not you.` });
   }
+  if (m.suspectCt)
+    v.push({ tone: 'flat', text: `<b>Data note:</b> ${m.suspectCt} round(s) quarantined from the component stats (putts/hole implausibly low — likely a Grint entry error). See the rounds table.` });
   if (m.recentEliteN >= 5 && m.recentEliteCt >= 2)
     v.push({ tone: 'good', text: `<b>Ceiling signal:</b> ${m.recentEliteCt} of your last ${m.recentEliteN} rounds hit your career-best decile (diff ≤ ${r1(m.bestDecileCut)}). Averages hide this — the good state is showing up more often. Identify what those rounds shared and do more of it.` });
   const top = leaks[0];
@@ -243,7 +263,7 @@ MY DATA (from my Grint analyzer, ${m.n} eighteen-hole rounds):
 - Median differential ${r1(m.medDiff)} (good-day 20th pct ${r1(m.ceiling)}, blow-up 80th pct ${r1(m.floor)})
 - Last-5 median ${r1(m.last5Med)}${m.priorMed !== null ? ` vs ${r1(m.priorMed)} prior baseline` : ''}
 - ${m.recentEliteCt} of last ${m.recentEliteN} rounds in my career-best decile (≤ ${r1(m.bestDecileCut)})
-- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5. Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round
+- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5.${m.pveAll !== null ? ` Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round` : ' (No GIR data, so putts can\'t be separated from chip proximity.)'}
 - Long game (score minus putts)/hole: ${r1(m.longAll)} career, ${r1(m.long5)} last-5
 - GIR ${m.girAll !== null ? Math.round(m.girAll) + '%' : 'n/a'}, FIR ${m.firAll !== null ? Math.round(m.firAll) + '%' : 'n/a'}
 - Ranked leaks (strokes/round): ${m.leaks.map(x => `${x.label} ${r1(x.strokes)}`).join(' · ')}
@@ -295,7 +315,7 @@ function render() {
     <div class="grid">
       <div class="stat"><div class="n">${r1(m.last5Med)}</div><div class="l">last-5 median differential (career ${r1(m.medDiff)})</div>${spark(f.map(r => r.diff), true)}</div>
       <div class="stat"><div class="n">${r1(m.putts5)}</div><div class="l">putts/hole last-5 (career ${r1(m.puttsAll)})</div>${spark(f.map(r => r.puttsPH), true)}</div>
-      <div class="stat"><div class="n">${m.pve5 !== null ? '+' + r1(m.pve5 * 18) : '–'}</div><div class="l">putts vs expected /round, last-5 (career +${r1(m.pveAll * 18)})</div>${spark(f.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH), true)}</div>
+      <div class="stat"><div class="n">${m.pve5 !== null ? '+' + r1(m.pve5 * 18) : '–'}</div><div class="l">putts vs expected /round, last-5 (career ${m.pveAll !== null ? '+' + r1(m.pveAll * 18) : 'n/a'})</div>${spark(f.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH), true)}</div>
       <div class="stat"><div class="n">${r1(m.long5)}</div><div class="l">long-game strokes/hole last-5 (career ${r1(m.longAll)})</div>${spark(f.map(r => r.longPH), true)}</div>
     </div>
     <table style="margin-top:10px"><tr><th>Last 5 vs career median</th><th>Δ</th></tr>
@@ -311,7 +331,7 @@ function render() {
   </div>
   <div class="card"><details><summary>All rounds (${rounds.length}, incl. 9-hole)</summary>
     <table><tr><th>Date</th><th>Course</th><th>H</th><th>Score</th><th>Putts</th><th>GIR</th><th>FIR</th><th>Diff</th></tr>
-    ${[...m.all].reverse().map(r => `<tr><td>${esc(r.date)}</td><td style="text-align:left">${esc(r.course)}</td><td>${r.holes}</td><td>${r.score}</td><td>${r.putts}</td><td>${r.gir !== null ? r.gir + '%' : ''}</td><td>${r.fir !== null ? r.fir + '%' : ''}</td><td>${r.diff}</td></tr>`).join('')}
+    ${[...m.all].reverse().map(r => `<tr><td>${esc(r.date)}${r.suspect ? ' ⚠' : ''}</td><td style="text-align:left">${esc(r.course)}</td><td>${r.holes}</td><td>${r.score}</td><td>${r.putts}</td><td>${r.gir !== null ? r.gir + '%' : ''}</td><td>${r.fir !== null ? r.fir + '%' : ''}</td><td>${r.diff}</td></tr>`).join('')}
     </table></details>
   </div>`;
 }
