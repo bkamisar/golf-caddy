@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Golf Caddy — Grint Analyzer</title>
+<style>
+  :root { --bg:#0f1512; --card:#1a231e; --ink:#e8f0ea; --dim:#9ab3a3; --line:#2c3a32;
+          --good:#5dd39e; --bad:#e07a5f; --accent:#8ecae6; --warn:#f2cc8f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:14px; }
+  h1 { font-size:20px; margin:6px 0 2px; } h1 span{color:var(--good);}
+  .sub { color:var(--dim); font-size:12.5px; margin-bottom:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em;
+             color:var(--dim); margin:0 0 8px; }
+  textarea { width:100%; min-height:110px; background:#101815; color:var(--ink);
+             border:1px solid var(--line); border-radius:8px; padding:8px; font-size:12px; }
+  button { background:var(--good); color:#0c130f; border:0; border-radius:8px;
+           padding:9px 14px; font-weight:700; font-size:14px; cursor:pointer; margin:6px 6px 0 0; }
+  button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line); }
+  .verdict { font-size:15px; margin:8px 0; padding:10px 12px; border-left:4px solid var(--accent);
+             background:#131c17; border-radius:0 8px 8px 0; }
+  .verdict.good { border-color:var(--good); } .verdict.bad { border-color:var(--bad); }
+  .verdict.warn { border-color:var(--warn); }
+  .verdict b { color:var(--accent); } .verdict.good b{color:var(--good);} .verdict.bad b{color:var(--bad);}
+  .verdict.warn b{color:var(--warn);}
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { padding:5px 7px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child,td:first-child { text-align:left; }
+  th { color:var(--dim); font-weight:600; }
+  .up{color:var(--good);} .down{color:var(--bad);} .flat{color:var(--dim);}
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
+  .stat { background:#131c17; border-radius:8px; padding:10px; }
+  .stat .n { font-size:22px; font-weight:800; } .stat .l { color:var(--dim); font-size:11.5px; }
+  svg { display:block; width:100%; height:46px; margin-top:6px; }
+  .foot { color:var(--dim); font-size:11px; margin:14px 0 30px; }
+  #msg { color:var(--warn); font-size:12.5px; min-height:16px; }
+  details summary { cursor:pointer; color:var(--dim); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⛳ Golf <span>Caddy</span></h1>
+  <div class="sub">Paste your Grint stats table → honest trends, one focus, and a coach debrief. All local, no account.</div>
+
+  <div class="card">
+    <h2>Add rounds</h2>
+    <textarea id="paste" placeholder="On The Grint: Stats → Scores list → select the whole table → copy → paste here. Re-pasting is safe (duplicates are merged)."></textarea>
+    <button onclick="doParse()">Parse &amp; save</button>
+    <button class="ghost" onclick="doExport()">Export JSON</button>
+    <button class="ghost" onclick="document.getElementById('imp').click()">Import</button>
+    <button class="ghost" onclick="doClear()">Clear all</button>
+    <input type="file" id="imp" style="display:none" onchange="doImport(event)">
+    <div id="msg"></div>
+  </div>
+
+  <div id="dash"></div>
+  <div class="foot">Putts-vs-expected uses bogey-golfer norms (2.15 putts on greens hit, 1.95 after a miss) so low-GIR rounds aren't miscounted as bad putting. 9-hole rounds count for putting/short-game signals but not the headline differential trend. Nothing leaves your browser.</div>
+</div>
+
+<script>
+/*ENGINE-START*/
+// ── Parser: The Grint "Scores" table paste (messy, multi-line) ──────────────
+function parseGrint(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  const rounds = [], skipped = [];
+  const isDate = l => /^\d{2}\/\d{2}\/\d{2}\b/.test(l);
+  // tee/rating line: "Green 68.40 | 121" (course names containing '|' lack this pattern)
+  const isRating = l => /\d+\.\d+\s*\|\s*\d+\s*$/.test(l);
+  let i = 0;
+  while (i < lines.length) {
+    if (!isDate(lines[i])) { i++; continue; }
+    const start = i;
+    const dm = lines[i].match(/^(\d{2})\/(\d{2})\/(\d{2})\s*(.*)$/);
+    let course = (dm[4] || '').trim();
+    i++;
+    let rating = null, slope = null;
+    while (i < lines.length && !isDate(lines[i])) {
+      if (isRating(lines[i])) {
+        const rm = lines[i].match(/(\d+\.\d+)\s*\|\s*(\d+)\s*$/);
+        rating = parseFloat(rm[1]); slope = parseInt(rm[2]); i++; break;
+      }
+      course = (course + ' ' + lines[i]).trim(); i++;
+    }
+    // collect numeric fields until "View" or the next date line
+    const nums = [], pcts = [];
+    let diff = null;
+    while (i < lines.length && !isDate(lines[i])) {
+      const l = lines[i];
+      if (/^View\b/i.test(l)) { i++; break; }
+      if (/^\d{1,3}%$/.test(l)) pcts.push(parseInt(l));
+      else if (/^\d+\.\d$/.test(l)) diff = parseFloat(l);          // hcp differential
+      else if (/^\d+$/.test(l)) nums.push(parseInt(l));
+      i++;
+    }
+    if (nums.length < 3 || diff === null) { skipped.push(lines[start]); continue; }
+    const [score, holes, putts] = nums;
+    let gir = null, fir = null;
+    if (pcts.length >= 2) { gir = pcts[0]; fir = pcts[1]; }
+    else if (pcts.length === 1) {
+      // One % only: GIR and FIR columns are indistinguishable in a paste.
+      // Heuristic: GIR rarely exceeds 30 for a 95+ shooter; FIR rarely below 36.
+      if (pcts[0] <= 30) gir = pcts[0];
+      else if (pcts[0] >= 36) fir = pcts[0];
+      // 31–35 is genuinely ambiguous → leave both null rather than guess.
+    }
+    course = course.replace(/^\(9\)\s*/, '').replace(/\s+/g, ' ').trim();
+    rounds.push({
+      date: `20${dm[3]}-${dm[1]}-${dm[2]}`,
+      course, rating, slope, score, holes, putts, gir, fir, diff,
+    });
+  }
+  return { rounds, skipped };
+}
+
+function mergeRounds(existing, incoming) {
+  const key = r => `${r.date}|${r.score}|${r.course}`;
+  const map = {};
+  existing.forEach(r => { map[key(r)] = r; });
+  let added = 0;
+  incoming.forEach(r => { if (!map[key(r)]) { map[key(r)] = r; added++; } });
+  const all = Object.values(map).sort((a, b) => a.date < b.date ? -1 : 1);
+  return { all, added };
+}
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+// Putts expected for a bogey-golfer given GIR: greens hit start ~2.15 putts
+// (long first putts), missed greens ~1.95 (chip proximity varies). Tunable.
+const EXP_PUTT_GIR = 2.15, EXP_PUTT_MISS = 1.95;
+
+function quantile(sorted, q) {
+  if (!sorted.length) return null;
+  const pos = (sorted.length - 1) * q, lo = Math.floor(pos);
+  return lo + 1 < sorted.length ? sorted[lo] + (sorted[lo + 1] - sorted[lo]) * (pos - lo) : sorted[lo];
+}
+const median = a => quantile([...a].sort((x, y) => x - y), 0.5);
+const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+const r1 = v => v === null || v === undefined || isNaN(v) ? null : Math.round(v * 10) / 10;
+
+function enrich(r) {
+  const e = { ...r };
+  e.puttsPH = r.putts / r.holes;
+  e.longPH  = (r.score - r.putts) / r.holes;      // strokes outside the hole-out putts
+  if (r.gir !== null) {
+    const girN = Math.round(r.gir / 100 * r.holes);
+    e.puttsVsExp = r.putts - (EXP_PUTT_GIR * girN + EXP_PUTT_MISS * (r.holes - girN));
+    e.puttsVsExpPH = e.puttsVsExp / r.holes;
+  } else { e.puttsVsExp = null; e.puttsVsExpPH = null; }
+  return e;
+}
+
+function computeMetrics(rounds) {
+  const all = rounds.map(enrich);
+  const full = all.filter(r => r.holes === 18);          // headline trend corpus
+  const n = full.length;
+  if (n < 3) return { all, full, enough: false };
+
+  const diffs = full.map(r => r.diff);
+  const sortedDiffs = [...diffs].sort((a, b) => a - b);
+  const last5  = full.slice(-5), prior = full.slice(0, -5);
+  const last10 = full.slice(-10);
+  const bestDecile = quantile(sortedDiffs, 0.10);
+
+  const m = {
+    all, full, enough: true, n,
+    // level + distribution (never bare means — see the July 2026 putting lesson)
+    medDiff: median(diffs),
+    ceiling: quantile(sortedDiffs, 0.20),   // your good golf
+    floor:   quantile(sortedDiffs, 0.80),   // your blowup level
+    last5Med:  median(last5.map(r => r.diff)),
+    priorMed:  prior.length >= 5 ? median(prior.map(r => r.diff)) : null,
+    // career-best-decile hit rate in recent rounds (distribution-shift detector)
+    bestDecileCut: bestDecile,
+    recentEliteCt: last10.filter(r => r.diff <= bestDecile).length,
+    recentEliteN: last10.length,
+    // component medians, last-5 vs all
+    putts5:   median(last5.map(r => r.puttsPH)),
+    puttsAll: median(full.map(r => r.puttsPH)),
+    pve5:   median(last5.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
+    pveAll: median(full.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
+    long5:   median(last5.map(r => r.longPH)),
+    longAll: median(full.map(r => r.longPH)),
+    girAll: mean(full.filter(r => r.gir !== null).map(r => r.gir)),
+    gir5:   mean(last5.filter(r => r.gir !== null).map(r => r.gir)),
+    firAll: mean(full.filter(r => r.fir !== null).map(r => r.fir)),
+  };
+
+  // ── Leak ranking (strokes per round, comparable across categories) ──
+  const longSorted = full.map(r => r.longPH).sort((a, b) => a - b);
+  const longLeak = (m.longAll - quantile(longSorted, 0.25)) * 18;
+  const leaks = [];
+  if (m.pveAll !== null)
+    leaks.push({ k: 'putting_shortgame', strokes: m.pveAll * 18,
+      label: 'Putting + chip proximity',
+      note: `${r1(m.pveAll * 18)} putts/round above the bogey-golfer expectation for your GIR — this blends stroke quality with how close your chips land; hole-level data would split them.` });
+  leaks.push({ k: 'blowups', strokes: m.floor - m.medDiff,
+    label: 'Blow-up rounds (consistency)',
+    note: `Your bad days run ${r1(m.floor - m.medDiff)} strokes over your OWN median — course management and damage control, not swing changes.` });
+  leaks.push({ k: 'longgame', strokes: longLeak,
+    label: 'Long game vs your own good days',
+    note: `Median ball-striking runs ${r1(longLeak)} strokes/round worse than your best-quartile rounds — repeatability, not new speed.` });
+  leaks.sort((a, b) => b.strokes - a.strokes);
+  m.leaks = leaks;
+
+  // ── Verdicts ──
+  const v = [];
+  if (m.priorMed !== null) {
+    const d = m.last5Med - m.priorMed;
+    v.push({ tone: d < -1 ? 'good' : d > 1 ? 'bad' : 'warn',
+      text: d < -1 ? `<b>Trending better:</b> last-5 median differential ${r1(m.last5Med)} vs ${r1(m.priorMed)} before — real movement, protect whatever changed.`
+           : d > 1 ? `<b>Trending worse:</b> last-5 median differential ${r1(m.last5Med)} vs ${r1(m.priorMed)} before.`
+           : `<b>Flat:</b> last-5 median ${r1(m.last5Med)} vs ${r1(m.priorMed)} baseline — no level change yet.` });
+  }
+  if (m.recentEliteN >= 5 && m.recentEliteCt >= 2)
+    v.push({ tone: 'good', text: `<b>Ceiling signal:</b> ${m.recentEliteCt} of your last ${m.recentEliteN} rounds hit your career-best decile (diff ≤ ${r1(m.bestDecileCut)}). Averages hide this — the good state is showing up more often. Identify what those rounds shared and do more of it.` });
+  const top = leaks[0];
+  v.push({ tone: 'warn', text: `<b>#1 focus — ${top.label}:</b> ${top.note}` });
+  if (m.girAll !== null && m.girAll < 20)
+    v.push({ tone: 'flat', text: `<b>Slow project:</b> GIR ${Math.round(m.girAll)}% (~${Math.round(m.girAll / 100 * 18)} greens/round) caps your ceiling, but it moves over months. Don't let range sessions crowd out the fast wins above.` });
+  if (m.firAll !== null && m.firAll >= 55)
+    v.push({ tone: 'flat', text: `<b>Non-problem:</b> fairways ${Math.round(m.firAll)}% — driving accuracy is fine for your level. Spend practice time elsewhere.` });
+  m.verdicts = v;
+  return m;
+}
+
+// ── Coach debrief prompt (paste into Claude) ─────────────────────────────────
+function coachPrompt(m) {
+  const l5 = m.full.slice(-5);
+  const rows = l5.map(r =>
+    `${r.date} ${r.course}: score ${r.score}, diff ${r.diff}, putts ${r.putts}` +
+    (r.gir !== null ? `, GIR ${r.gir}%` : '') + (r.fir !== null ? `, FIR ${r.fir}%` : '')).join('\n');
+  return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my data below — no generic tips.
+- FALDO (swing mechanics): tempo, fundamentals, repeatability.
+- BRYSON (data): ruthlessly quantitative, calls out what the numbers do and don't support.
+- FAXON (putting): stroke, green reading, speed.
+- PHIL (short game): chipping, pitching, scrambling — and gambler's course management.
+
+MY DATA (from my Grint analyzer, ${m.n} eighteen-hole rounds):
+- Median differential ${r1(m.medDiff)} (good-day 20th pct ${r1(m.ceiling)}, blow-up 80th pct ${r1(m.floor)})
+- Last-5 median ${r1(m.last5Med)}${m.priorMed !== null ? ` vs ${r1(m.priorMed)} prior baseline` : ''}
+- ${m.recentEliteCt} of last ${m.recentEliteN} rounds in my career-best decile (≤ ${r1(m.bestDecileCut)})
+- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5. Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round
+- Long game (score minus putts)/hole: ${r1(m.longAll)} career, ${r1(m.long5)} last-5
+- GIR ${m.girAll !== null ? Math.round(m.girAll) + '%' : 'n/a'}, FIR ${m.firAll !== null ? Math.round(m.firAll) + '%' : 'n/a'}
+- Ranked leaks (strokes/round): ${m.leaks.map(x => `${x.label} ${r1(x.strokes)}`).join(' · ')}
+
+LAST 5 ROUNDS:
+${rows}
+
+Debrief my recent play as a conversation between the four of you: what's real in the recent trend, what's noise, where you disagree, and end with ONE practice priority each (a specific drill with success criteria), then a consensus pick for the single most valuable thing before my next round.`;
+}
+/*ENGINE-END*/
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+const LS = 'golfcaddy_rounds';
+const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
+const save = r => localStorage.setItem(LS, JSON.stringify(r));
+// Escape any string that came from the paste before it touches innerHTML.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function spark(vals, invert) {
+  if (vals.length < 2) return '';
+  const w = 300, h = 44, mn = Math.min(...vals), mx = Math.max(...vals), rg = mx - mn || 1;
+  const pts = vals.map((v, i) =>
+    `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 4 - (v - mn) / rg * (h - 8)).toFixed(1)}`).join(' ');
+  const lastUp = vals[vals.length - 1] <= median(vals);
+  const col = (invert ? !lastUp : lastUp) ? 'var(--bad)' : 'var(--good)';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2"/></svg>`;
+}
+
+function render() {
+  const rounds = load();
+  const dash = document.getElementById('dash');
+  if (!rounds.length) { dash.innerHTML = '<div class="card"><h2>No rounds yet</h2>Paste your Grint table above.</div>'; return; }
+  const m = computeMetrics(rounds);
+  if (!m.enough) { dash.innerHTML = '<div class="card"><h2>Need at least 3 eighteen-hole rounds</h2></div>'; return; }
+  const f = m.full;
+  const trendCell = (a, b, inv) => {
+    if (a === null || b === null) return '<span class="flat">–</span>';
+    const d = a - b, good = inv ? d < 0 : d > 0;
+    return `<span class="${Math.abs(d) < 0.03 ? 'flat' : good ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${r1(d)}</span>`;
+  };
+  dash.innerHTML = `
+  <div class="card"><h2>Verdicts — ${m.n} rounds analyzed</h2>
+    ${m.verdicts.map(v => `<div class="verdict ${v.tone}">${v.text}</div>`).join('')}
+  </div>
+  <div class="card"><h2>Trends (18-hole rounds, oldest → newest)</h2>
+    <div class="grid">
+      <div class="stat"><div class="n">${r1(m.last5Med)}</div><div class="l">last-5 median differential (career ${r1(m.medDiff)})</div>${spark(f.map(r => r.diff), true)}</div>
+      <div class="stat"><div class="n">${r1(m.putts5)}</div><div class="l">putts/hole last-5 (career ${r1(m.puttsAll)})</div>${spark(f.map(r => r.puttsPH), true)}</div>
+      <div class="stat"><div class="n">${m.pve5 !== null ? '+' + r1(m.pve5 * 18) : '–'}</div><div class="l">putts vs expected /round, last-5 (career +${r1(m.pveAll * 18)})</div>${spark(f.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH), true)}</div>
+      <div class="stat"><div class="n">${r1(m.long5)}</div><div class="l">long-game strokes/hole last-5 (career ${r1(m.longAll)})</div>${spark(f.map(r => r.longPH), true)}</div>
+    </div>
+    <table style="margin-top:10px"><tr><th>Last 5 vs career median</th><th>Δ</th></tr>
+      <tr><td>Differential</td><td>${trendCell(m.last5Med, m.medDiff, true)}</td></tr>
+      <tr><td>Putts/hole</td><td>${trendCell(m.putts5, m.puttsAll, true)}</td></tr>
+      <tr><td>Putts vs expected (/hole)</td><td>${trendCell(m.pve5, m.pveAll, true)}</td></tr>
+      <tr><td>Long game strokes/hole</td><td>${trendCell(m.long5, m.longAll, true)}</td></tr>
+    </table>
+  </div>
+  <div class="card"><h2>Coach debrief — copy into Claude</h2>
+    <textarea id="coach" readonly>${esc(coachPrompt(m))}</textarea>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
+  </div>
+  <div class="card"><details><summary>All rounds (${rounds.length}, incl. 9-hole)</summary>
+    <table><tr><th>Date</th><th>Course</th><th>H</th><th>Score</th><th>Putts</th><th>GIR</th><th>FIR</th><th>Diff</th></tr>
+    ${[...m.all].reverse().map(r => `<tr><td>${esc(r.date)}</td><td style="text-align:left">${esc(r.course)}</td><td>${r.holes}</td><td>${r.score}</td><td>${r.putts}</td><td>${r.gir !== null ? r.gir + '%' : ''}</td><td>${r.fir !== null ? r.fir + '%' : ''}</td><td>${r.diff}</td></tr>`).join('')}
+    </table></details>
+  </div>`;
+}
+
+function msg(t) { document.getElementById('msg').textContent = t; }
+function doParse() {
+  const { rounds, skipped } = parseGrint(document.getElementById('paste').value);
+  if (!rounds.length) { msg('No rounds recognized — paste the whole Grint scores table, including dates.'); return; }
+  const { all, added } = mergeRounds(load(), rounds);
+  save(all);
+  msg(`Parsed ${rounds.length} rounds, ${added} new (${all.length} total).` + (skipped.length ? ` Skipped ${skipped.length} unreadable.` : ''));
+  document.getElementById('paste').value = '';
+  render();
+}
+function doExport() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(load(), null, 1)], { type: 'application/json' }));
+  a.download = 'golf-rounds.json'; a.click();
+}
+function doImport(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(t => { const { all, added } = mergeRounds(load(), JSON.parse(t)); save(all); msg(`Imported ${added} new rounds.`); render(); });
+}
+function doClear() { if (confirm('Delete all stored rounds?')) { localStorage.removeItem(LS); render(); } }
+render();
+</script>
+</body>
+</html>
