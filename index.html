@@ -49,7 +49,11 @@
 
   <div class="card">
     <h2>Add rounds</h2>
-    <textarea id="paste" placeholder="On The Grint: Stats → Scores list → select the whole table → copy → paste here. Re-pasting is safe (duplicates are merged)."></textarea>
+    <select id="source" style="background:#101815;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px;font-size:13px;margin-bottom:8px;width:100%">
+      <option value="grint">The Grint — paste the Scores table</option>
+      <option value="generic">Other app — CSV / table with a header row</option>
+    </select>
+    <textarea id="paste" placeholder="The Grint: Stats → Scores → select the whole table → copy → paste. Other apps: export/copy a table WITH a header row (needs at least Date + Score columns; Rating+Slope or a Differential column enable the handicap trend). Re-pasting is safe — duplicates merge."></textarea>
     <button onclick="doParse()">Parse &amp; save</button>
     <button class="ghost" onclick="doExport()">Export JSON</button>
     <button class="ghost" onclick="document.getElementById('imp').click()">Import</button>
@@ -117,6 +121,70 @@ function parseGrint(text) {
   return { rounds, skipped };
 }
 
+// ── Generic adapter: any app that can export a table with a header row ───────
+// Maps columns by header keyword to the canonical round shape, so the whole
+// analytics engine is reused unchanged. Best-effort by design — I can't hardcode
+// a parser for an app I've never seen a sample of; bring a friend's export and a
+// named adapter is a few lines. Missing columns degrade gracefully (a round with
+// no differential still feeds putting/short-game signals, just not the hcp trend).
+const p2 = x => String(x).padStart(2, '0');
+function parseDateLoose(s) {
+  s = (s || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${p2(m[2])}-${p2(m[3])}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${p2(m[1])}-${p2(m[2])}`;
+  return s || '0000-00-00';
+}
+function finalizeRound(r) {
+  if (r.score == null || r.score <= 0) return null;
+  if (!r.holes) r.holes = 18;
+  // Differential fallback when the app doesn't export one but gives rating+slope.
+  if (r.diff == null && r.rating != null && r.slope)
+    r.diff = Math.round((r.score - r.rating) * 113 / r.slope * 10) / 10;
+  r.course = (r.course || '').replace(/\s+/g, ' ').trim();
+  return r;
+}
+function parseGeneric(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
+  if (lines.length < 2) return { rounds: [], skipped: [] };
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+  const split = l => l.split(delim).map(c => c.trim().replace(/^"|"$/g, ''));
+  const H = split(lines[0]).map(h => h.toLowerCase());
+  const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  const col = {
+    date:   find('date'),
+    course: find('course', 'name'),
+    score:  H.findIndex(h => (h.includes('score') || h === 'gross' || h.includes('total')) && !h.includes('diff')),
+    holes:  find('holes'),
+    putts:  find('putt'),
+    gir:    find('gir', 'green'),
+    fir:    H.findIndex(h => h.includes('fir') || h.includes('fairway')),
+    rating: H.findIndex(h => h.includes('rating') || h === 'cr'),
+    slope:  find('slope'),
+    diff:   H.findIndex(h => h.includes('diff') || h.includes('index')),
+  };
+  const num = (c, i) => { if (i < 0) return null; const v = parseFloat(String(c[i]).replace('%', '')); return isNaN(v) ? null : v; };
+  const rounds = [], skipped = [];
+  lines.slice(1).forEach(line => {
+    const c = split(line);
+    const r = finalizeRound({
+      date: parseDateLoose(col.date >= 0 ? c[col.date] : ''),
+      course: col.course >= 0 ? c[col.course] : '',
+      rating: num(c, col.rating), slope: num(c, col.slope),
+      score: num(c, col.score), holes: num(c, col.holes),
+      putts: num(c, col.putts), gir: num(c, col.gir), fir: num(c, col.fir), diff: num(c, col.diff),
+    });
+    if (r) rounds.push(r); else skipped.push(line);
+  });
+  return { rounds, skipped };
+}
+
+const SOURCES = {
+  grint:   { label: 'The Grint', parse: parseGrint },
+  generic: { label: 'Other app (CSV/table)', parse: parseGeneric },
+};
+
 function mergeRounds(existing, incoming) {
   const key = r => `${r.date}|${r.score}|${r.course}`;
   const map = {};
@@ -143,14 +211,27 @@ const r1 = v => v === null || v === undefined || isNaN(v) ? null : Math.round(v 
 
 function enrich(r) {
   const e = { ...r };
-  e.puttsPH = r.putts / r.holes;
-  e.longPH  = (r.score - r.putts) / r.holes;      // strokes outside the hole-out putts
-  if (r.gir !== null) {
+  const hasP = r.putts != null;                   // other apps may not export putts
+  e.puttsPH = hasP ? r.putts / r.holes : null;
+  e.longPH  = hasP ? (r.score - r.putts) / r.holes : null;
+  if (r.gir !== null && hasP) {
     const girN = Math.round(r.gir / 100 * r.holes);
     e.puttsVsExp = r.putts - (EXP_PUTT_GIR * girN + EXP_PUTT_MISS * (r.holes - girN));
     e.puttsVsExpPH = e.puttsVsExp / r.holes;
   } else { e.puttsVsExp = null; e.puttsVsExpPH = null; }
   return e;
+}
+
+// GHIN/Grint handicap index: best-of-N of the last 20 differentials × 0.96,
+// with the USGA small-set count/adjustment table. Golfers recognize this number.
+function handicapIndex(diffs) {
+  const last = diffs.slice(-20), n = last.length;
+  if (n < 3) return null;
+  const table = [[3,1,-2],[4,1,-1],[5,1,0],[6,2,-1],[8,2,0],[11,3,0],[14,4,0],[16,5,0],[18,6,0],[19,7,0],[20,8,0]];
+  let cnt = 8, adj = 0;
+  for (const [maxN, c, a] of table) if (n <= maxN) { cnt = c; adj = a; break; }
+  const best = [...last].sort((x, y) => x - y).slice(0, cnt);
+  return mean(best) * 0.96 + adj;
 }
 
 function computeMetrics(rounds) {
@@ -162,7 +243,7 @@ function computeMetrics(rounds) {
   // data-entry artifact (e.g. an 11-putt 9-holer); keep in the log, exclude
   // from all component signals.
   all.forEach(r => { r.suspect = r.puttsPH < 1.4; });
-  const full = all.filter(r => r.holes === 18);          // headline trend corpus
+  const full = all.filter(r => r.holes === 18 && r.diff != null);  // headline trend corpus
   const n = full.length;
   if (n < 3) return { all, full, enough: false };
 
@@ -191,23 +272,32 @@ function computeMetrics(rounds) {
     recentEliteCt: last10.filter(r => r.diff <= bestDecile).length,
     recentEliteN: last10.length,
     // component medians (18h + 9h, suspect rows excluded), last-5 vs all
-    putts5:   median(comp5.map(r => r.puttsPH)),
-    puttsAll: median(comp.map(r => r.puttsPH)),
+    putts5:   median(comp5.map(r => r.puttsPH).filter(v => v != null)),
+    puttsAll: median(comp.map(r => r.puttsPH).filter(v => v != null)),
     pve5:   median(comp5.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
     pveAll: median(comp.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH)),
-    long5:   median(comp5.map(r => r.longPH)),
-    longAll: median(comp.map(r => r.longPH)),
+    long5:   median(comp5.map(r => r.longPH).filter(v => v != null)),
+    longAll: median(comp.map(r => r.longPH).filter(v => v != null)),
     girAll: mean(comp.filter(r => r.gir !== null).map(r => r.gir)),
     gir5:   mean(comp5.filter(r => r.gir !== null).map(r => r.gir)),
     firAll: mean(comp.filter(r => r.fir !== null).map(r => r.fir)),
     // course-mix confound detector (slope of recent vs career trend corpus)
     slope5:   mean(last5.filter(r => r.slope).map(r => r.slope)),
     slopeAll: mean(full.filter(r => r.slope).map(r => r.slope)),
+    // handicap index estimate (GHIN best-of-20 method)
+    hcpIndex: handicapIndex(full.map(r => r.diff)),
   };
+  // Good-round recipe: what your career-best-decile rounds actually looked like.
+  const elite = full.filter(r => r.diff <= bestDecile);
+  m.eliteN = elite.length;
+  m.eliteAvgPutts = mean(elite.map(r => r.putts).filter(v => v != null));
+  m.fullAvgPutts  = mean(full.map(r => r.putts).filter(v => v != null));
+  m.eliteAvgGir   = mean(elite.filter(r => r.gir !== null).map(r => r.gir));
 
   // ── Leak ranking (strokes per round, comparable across categories) ──
-  const longSorted = full.map(r => r.longPH).sort((a, b) => a - b);
-  const longLeak = (m.longAll - quantile(longSorted, 0.25)) * 18;
+  const longVals = full.map(r => r.longPH).filter(v => v != null).sort((a, b) => a - b);
+  const longLeak = (m.longAll != null && longVals.length >= 4)
+    ? (m.longAll - quantile(longVals, 0.25)) * 18 : null;
   const leaks = [];
   if (m.pveAll !== null)
     leaks.push({ k: 'putting_shortgame', strokes: m.pveAll * 18,
@@ -216,9 +306,10 @@ function computeMetrics(rounds) {
   leaks.push({ k: 'blowups', strokes: m.floor - m.medDiff,
     label: 'Blow-up rounds (consistency)',
     note: `Your bad days run ${r1(m.floor - m.medDiff)} strokes over your OWN median — course management and damage control, not swing changes.` });
-  leaks.push({ k: 'longgame', strokes: longLeak,
-    label: 'Long game vs your own good days',
-    note: `Median ball-striking runs ${r1(longLeak)} strokes/round worse than your best-quartile rounds — repeatability, not new speed.` });
+  if (longLeak != null && !isNaN(longLeak))
+    leaks.push({ k: 'longgame', strokes: longLeak,
+      label: 'Long game vs your own good days',
+      note: `Median ball-striking runs ${r1(longLeak)} strokes/round worse than your best-quartile rounds — repeatability, not new speed.` });
   leaks.sort((a, b) => b.strokes - a.strokes);
   m.leaks = leaks;
 
@@ -235,8 +326,14 @@ function computeMetrics(rounds) {
   }
   if (m.suspectCt)
     v.push({ tone: 'flat', text: `<b>Data note:</b> ${m.suspectCt} round(s) quarantined from the component stats (putts/hole implausibly low — likely a Grint entry error). See the rounds table.` });
-  if (m.recentEliteN >= 5 && m.recentEliteCt >= 2)
-    v.push({ tone: 'good', text: `<b>Ceiling signal:</b> ${m.recentEliteCt} of your last ${m.recentEliteN} rounds hit your career-best decile (diff ≤ ${r1(m.bestDecileCut)}). Averages hide this — the good state is showing up more often. Identify what those rounds shared and do more of it.` });
+  if (m.recentEliteN >= 5 && m.recentEliteCt >= 2) {
+    let recipe = '';
+    if (m.eliteAvgPutts !== null && m.fullAvgPutts !== null)
+      recipe = ` Your recipe: those best rounds averaged ${Math.round(m.eliteAvgPutts)} putts` +
+        (m.eliteAvgGir !== null ? ` and ${Math.round(m.eliteAvgGir)}% GIR` : '') +
+        `, vs ${Math.round(m.fullAvgPutts)} putts on a normal day — the putting gap IS the difference.`;
+    v.push({ tone: 'good', text: `<b>Ceiling signal:</b> ${m.recentEliteCt} of your last ${m.recentEliteN} rounds hit your career-best decile (diff ≤ ${r1(m.bestDecileCut)}). Averages hide this — the good state is showing up more often.${recipe}` });
+  }
   const top = leaks[0];
   v.push({ tone: 'warn', text: `<b>#1 focus — ${top.label}:</b> ${top.note}` });
   if (m.girAll !== null && m.girAll < 20)
@@ -251,7 +348,8 @@ function computeMetrics(rounds) {
 function coachPrompt(m) {
   const l5 = m.full.slice(-5);
   const rows = l5.map(r =>
-    `${r.date} ${r.course}: score ${r.score}, diff ${r.diff}, putts ${r.putts}` +
+    `${r.date} ${r.course}: score ${r.score}, diff ${r.diff}` +
+    (r.putts != null ? `, putts ${r.putts}` : '') +
     (r.gir !== null ? `, GIR ${r.gir}%` : '') + (r.fir !== null ? `, FIR ${r.fir}%` : '')).join('\n');
   return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my data below — no generic tips.
 - FALDO (swing mechanics): tempo, fundamentals, repeatability.
@@ -263,8 +361,8 @@ MY DATA (from my Grint analyzer, ${m.n} eighteen-hole rounds):
 - Median differential ${r1(m.medDiff)} (good-day 20th pct ${r1(m.ceiling)}, blow-up 80th pct ${r1(m.floor)})
 - Last-5 median ${r1(m.last5Med)}${m.priorMed !== null ? ` vs ${r1(m.priorMed)} prior baseline` : ''}
 - ${m.recentEliteCt} of last ${m.recentEliteN} rounds in my career-best decile (≤ ${r1(m.bestDecileCut)})
-- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5.${m.pveAll !== null ? ` Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round` : ' (No GIR data, so putts can\'t be separated from chip proximity.)'}
-- Long game (score minus putts)/hole: ${r1(m.longAll)} career, ${r1(m.long5)} last-5
+${m.puttsAll !== null ? `- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5.${m.pveAll !== null ? ` Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round` : ' (No GIR data, so putts can\'t be separated from chip proximity.)'}` : '- (No putts data in this export.)'}
+${m.longAll !== null ? `- Long game (score minus putts)/hole: ${r1(m.longAll)} career, ${r1(m.long5)} last-5` : ''}
 - GIR ${m.girAll !== null ? Math.round(m.girAll) + '%' : 'n/a'}, FIR ${m.firAll !== null ? Math.round(m.firAll) + '%' : 'n/a'}
 - Ranked leaks (strokes/round): ${m.leaks.map(x => `${x.label} ${r1(x.strokes)}`).join(' · ')}
 
@@ -286,6 +384,7 @@ function esc(s) {
 }
 
 function spark(vals, invert) {
+  vals = (vals || []).filter(v => v != null && !isNaN(v));
   if (vals.length < 2) return '';
   const w = 300, h = 44, mn = Math.min(...vals), mx = Math.max(...vals), rg = mx - mn || 1;
   const pts = vals.map((v, i) =>
@@ -308,15 +407,15 @@ function render() {
     return `<span class="${Math.abs(d) < 0.03 ? 'flat' : good ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${r1(d)}</span>`;
   };
   dash.innerHTML = `
-  <div class="card"><h2>Verdicts — ${m.n} rounds analyzed</h2>
+  <div class="card"><h2>Verdicts — ${m.n} rounds analyzed${m.hcpIndex !== null ? ` · est. index ${r1(m.hcpIndex)}` : ''}</h2>
     ${m.verdicts.map(v => `<div class="verdict ${v.tone}">${v.text}</div>`).join('')}
   </div>
   <div class="card"><h2>Trends (18-hole rounds, oldest → newest)</h2>
     <div class="grid">
       <div class="stat"><div class="n">${r1(m.last5Med)}</div><div class="l">last-5 median differential (career ${r1(m.medDiff)})</div>${spark(f.map(r => r.diff), true)}</div>
-      <div class="stat"><div class="n">${r1(m.putts5)}</div><div class="l">putts/hole last-5 (career ${r1(m.puttsAll)})</div>${spark(f.map(r => r.puttsPH), true)}</div>
+      <div class="stat"><div class="n">${r1(m.putts5) ?? '–'}</div><div class="l">putts/hole last-5 (career ${r1(m.puttsAll) ?? 'n/a'})</div>${spark(f.map(r => r.puttsPH), true)}</div>
       <div class="stat"><div class="n">${m.pve5 !== null ? '+' + r1(m.pve5 * 18) : '–'}</div><div class="l">putts vs expected /round, last-5 (career ${m.pveAll !== null ? '+' + r1(m.pveAll * 18) : 'n/a'})</div>${spark(f.filter(r => r.puttsVsExpPH !== null).map(r => r.puttsVsExpPH), true)}</div>
-      <div class="stat"><div class="n">${r1(m.long5)}</div><div class="l">long-game strokes/hole last-5 (career ${r1(m.longAll)})</div>${spark(f.map(r => r.longPH), true)}</div>
+      <div class="stat"><div class="n">${r1(m.long5) ?? '–'}</div><div class="l">long-game strokes/hole last-5 (career ${r1(m.longAll) ?? 'n/a'})</div>${spark(f.map(r => r.longPH), true)}</div>
     </div>
     <table style="margin-top:10px"><tr><th>Last 5 vs career median</th><th>Δ</th></tr>
       <tr><td>Differential</td><td>${trendCell(m.last5Med, m.medDiff, true)}</td></tr>
@@ -338,8 +437,9 @@ function render() {
 
 function msg(t) { document.getElementById('msg').textContent = t; }
 function doParse() {
-  const { rounds, skipped } = parseGrint(document.getElementById('paste').value);
-  if (!rounds.length) { msg('No rounds recognized — paste the whole Grint scores table, including dates.'); return; }
+  const src = document.getElementById('source').value;
+  const { rounds, skipped } = SOURCES[src].parse(document.getElementById('paste').value);
+  if (!rounds.length) { msg(src === 'grint' ? 'No rounds recognized — paste the whole Grint scores table, including dates.' : 'No rows recognized — the paste needs a header row with at least Date and Score columns.'); return; }
   const { all, added } = mergeRounds(load(), rounds);
   save(all);
   msg(`Parsed ${rounds.length} rounds, ${added} new (${all.length} total).` + (skipped.length ? ` Skipped ${skipped.length} unreadable.` : ''));

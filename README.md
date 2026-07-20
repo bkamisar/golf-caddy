@@ -54,3 +54,28 @@ DOM-free between the `/*ENGINE-START*/ … /*ENGINE-END*/` markers — testable 
 node by extracting that block (see git history for the harness pattern).
 
 Built 2026-07-19 with Claude (Fable 5).
+
+## Multiple scoring apps (source adapters)
+
+The **source dropdown** picks how a paste is parsed; everything downstream (metrics,
+verdicts, coach prompt) is shared:
+
+- **The Grint** — paste the Scores table (the messy multi-line format).
+- **Other app — CSV / table** — any export with a header row. Columns are mapped by
+  keyword (date, score, putts, gir, fir, rating/CR, slope, differential/index), so
+  it handles comma or tab data and `MM/DD/YYYY` or `YYYY-MM-DD` dates. It only needs
+  **Date + Score**; add **Rating + Slope** (or a Differential column) and it computes
+  the handicap differential itself. Missing columns degrade gracefully — a putts-less
+  export still gets blow-up/consistency analysis, just not the putting leak.
+
+This is best-effort by design: hardcoding a parser for an app I've never seen a
+sample of would be guessing. Bring a friend's real export and adding a *named*
+adapter (like Grint's) is a few lines in the `SOURCES` registry.
+
+## Handicap index & good-round recipe
+
+- **Est. index** (shown by the Verdicts header) uses the GHIN/Grint method — best-of
+  the last 20 differentials × 0.96, with the USGA small-set count/adjustment table.
+- The **Ceiling signal** verdict now states your *recipe*: the average putts (and GIR)
+  in your career-best-decile rounds vs a normal day, so "what a good round looks like"
+  is a concrete number, not a platitude.
