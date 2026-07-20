@@ -149,7 +149,20 @@ function parseGeneric(text) {
   const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
   if (lines.length < 2) return { rounds: [], skipped: [] };
   const delim = lines[0].includes('\t') ? '\t' : ',';
-  const split = l => l.split(delim).map(c => c.trim().replace(/^"|"$/g, ''));
+  // Quote-aware split: a comma inside "Pebble Beach, CA" must NOT split the row
+  // (naive split shifts every later column — caught in adversarial test A1).
+  const split = l => {
+    if (delim === '\t') return l.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      if (ch === '"') { if (q && l[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === ',' && !q) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map(c => c.trim());
+  };
   const H = split(lines[0]).map(h => h.toLowerCase());
   const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
   const col = {
