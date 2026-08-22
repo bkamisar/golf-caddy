@@ -557,6 +557,51 @@ function computeGapping(groups) {
   if (rows.length) { rows[rows.length - 1].gapToNext = null; rows[rows.length - 1].gapWarning = false; }
   return rows;
 }
+
+// ── Trend: most recent 2 sessions vs previous 3, per club ────────────────────
+// "Session" here means a club-session for THIS club specifically — sessions
+// where the club wasn't hit are absent from the array entirely, so a club hit
+// on 5 visits gets a full window even with other clubs' visits interleaved.
+function computeTrend(sessions) {
+  const n = sessions.length;
+  if (n < 3) return { enough: false, reason: 'not enough sessions' };
+  const recent = sessions.slice(-2);
+  const baseline = sessions.slice(-5, -2);
+  if (recent.length < 1 || baseline.length < 2) return { enough: false, reason: 'not enough sessions' };
+
+  const allShots = arr => arr.flatMap(s => s.shots);
+  const cleanShots = arr => allShots(arr).filter(sh => !sh.quarantined);
+  const recentAll = allShots(recent), baselineAll = allShots(baseline);
+  const recentClean = cleanShots(recent), baselineClean = cleanShots(baseline);
+  if (recentClean.length < 5 || baselineClean.length < 5) return { enough: false, reason: 'not enough clean shots' };
+
+  // Ball/weather confounder split: caveat unless BOTH sides are fully tagged
+  // AND every session on both sides shares identical conditions.
+  const tagKey = s => JSON.stringify(s.tags || {});
+  const hasKnownTags = s => !!(s.tags && (s.tags.ball || s.tags.venue || s.tags.tempF != null));
+  const allTagged = [...recent, ...baseline].every(hasKnownTags);
+  const recentKeys = new Set(recent.map(tagKey)), baselineKeys = new Set(baseline.map(tagKey));
+  const sameConditions = allTagged && recentKeys.size === 1 && baselineKeys.size === 1 &&
+                          [...recentKeys][0] === [...baselineKeys][0];
+  const caveat = !sameConditions;
+
+  const med = (shots, key) => median(shots.map(s => s[key]).filter(v => v != null));
+  const rate = (all, clean) => all.length ? 1 - clean.length / all.length : null;
+
+  return {
+    enough: true, caveat,
+    // ball/weather-independent — compared freely
+    clubSpeed:   { recent: med(recentClean, 'clubSpeed'),   baseline: med(baselineClean, 'clubSpeed') },
+    attackAngle: { recent: med(recentClean, 'attackAngle'), baseline: med(baselineClean, 'attackAngle') },
+    sideBias:    { recent: mean(recentClean.map(s => s.side).filter(v => v != null)),
+                   baseline: mean(baselineClean.map(s => s.side).filter(v => v != null)) },
+    mishitRate:  { recent: rate(recentAll, recentClean), baseline: rate(baselineAll, baselineClean) },
+    // ball/weather-dependent — caveated when conditions differ or are unknown
+    carry:     { recent: med(recentClean, 'carry'),     baseline: med(baselineClean, 'carry') },
+    ballSpeed: { recent: med(recentClean, 'ballSpeed'), baseline: med(baselineClean, 'ballSpeed') },
+    spin:      { recent: med(recentClean, 'spin'),      baseline: med(baselineClean, 'spin') },
+  };
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────

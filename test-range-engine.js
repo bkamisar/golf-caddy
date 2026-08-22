@@ -323,4 +323,42 @@ const fewShotsSession = { date: '2026-08-10', dateAssumed: false, clubCode: '9i'
 const gaps16 = computeGapping(groupByClub([fewShotsSession]));
 chk('T16 low confidence with 1 clean shot', gaps16[0].lowConfidence === true);
 
+// T17. computeTrend: 5 synthetic 7-iron sessions, recent 2 clearly better
+function fakeSession(date, carries, tags) {
+  return {
+    date, dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: tags || {},
+    shots: carries.map(c => ({ clubSpeed: 32, attackAngle: 2, ballSpeed: 42, spin: 5500, carry: c, side: 1 })),
+  };
+}
+const hist17 = [
+  fakeSession('2026-07-01', [115, 116, 114, 117, 115]),
+  fakeSession('2026-07-08', [116, 115, 117, 114, 116]),
+  fakeSession('2026-07-15', [117, 116, 118, 115, 117]),
+  fakeSession('2026-08-01', [122, 123, 121, 124, 122]),
+  fakeSession('2026-08-08', [124, 123, 125, 122, 124]),
+];
+const groups17 = groupByClub(hist17);
+const t17 = computeTrend(groups17[0].sessions);
+chk('T17 enough data', t17.enough === true);
+chk('T17 recent carry higher than baseline', t17.carry.recent > t17.carry.baseline);
+chk('T17 caveat fires (no tags at all)', t17.caveat === true);
+
+// T18. Same scenario but with matching tags on both sides → no caveat
+const hist18 = hist17.map(s => ({ ...s, tags: { ball: 'range', venue: 'outdoor', tempF: 80 } }));
+const t18 = computeTrend(groupByClub(hist18)[0].sessions);
+chk('T18 no caveat when conditions match throughout', t18.caveat === false);
+
+// T19. Only 2 sessions total → not enough
+const t19 = computeTrend(groupByClub(hist17.slice(0, 2))[0].sessions);
+chk('T19 not enough with only 2 sessions', t19.enough === false);
+
+// T20. 3+ sessions but fewer than 5 clean shots on one side → not enough
+const thin20 = [
+  fakeSession('2026-07-01', [115]),
+  fakeSession('2026-07-08', [116]),
+  fakeSession('2026-08-01', [122]),
+];
+const t20 = computeTrend(groupByClub(thin20)[0].sessions);
+chk('T20 not enough with thin shot counts', t20.enough === false);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
