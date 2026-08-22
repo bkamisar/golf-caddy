@@ -230,4 +230,37 @@ const forward15 = { ...shot15 };
 const roundtrip15 = normalizeShotUnits(forward15, { distance: 'yd', speed: 'mph' });
 chk('T15 round-trip yd/mph -> m/m-s via engine math preserves shotKey at 1 decimal', shotKey(roundtrip15) === shotKey(shot15));
 
+// T12. Quarantine on the real 7i session: shot2 (smash 1.11, bad strike) and
+// shot10 (spin 1970 vs ~5470 median AND lowest-but-one carry) are the only two
+// flagged. Shots 3 and 9 are low-spin too but are the LONGEST shots — must
+// survive, because the rule is "low spin AND low carry", not spin alone.
+const q12 = quarantineClub([{ ...parseTrackman(SAMPLE_7I).sessions[0] }]);
+const shots12 = q12[0].shots;
+chk('T12 shot1 clean', shots12[0].quarantined === false);
+chk('T12 shot2 quarantined (bad strike)', shots12[1].quarantined === true && shots12[1].quarantineReason === 'bad_strike');
+chk('T12 shot3 clean (longest shot, not a flier)', shots12[2].quarantined === false);
+// shots 4 and 5 are the near-boundary case that broke the first draft of this
+// rule: smash 1.189 and 1.201, BELOW a textbook-plausible 1.25 iron floor but
+// ordinary shots, not mishits. Locks the calibrated 1.15 floor in place.
+chk('T12 shot4 clean (smash 1.189, near boundary, not a mishit)', shots12[3].quarantined === false);
+chk('T12 shot5 clean (smash 1.201, near boundary, not a mishit)', shots12[4].quarantined === false);
+chk('T12 shot8 clean (smash 1.255, near boundary)', shots12[7].quarantined === false);
+chk('T12 shot9 clean (2nd longest, not a flier)', shots12[8].quarantined === false);
+chk('T12 shot10 quarantined (thin flier)', shots12[9].quarantined === true && shots12[9].quarantineReason === 'thin_flier');
+chk('T12 shot11 clean (smash 1.280, near boundary)', shots12[10].quarantined === false);
+chk('T12 shot12 clean (smash 1.255, near boundary)', shots12[11].quarantined === false);
+chk('T12 exactly 2 of 12 quarantined', shots12.filter(s => s.quarantined).length === 2);
+
+// T13. Fewer than 6 shots in a club-session with no cross-session history:
+// thin-flier rule must be skipped (no crash, no false positives from an
+// unstable 2-shot median), smash-factor rule still applies.
+const tiny = { date: '2026-08-01', dateAssumed: false, clubCode: 'sw', club: canonicalClub('sw'), tags: {},
+  shots: [
+    { clubSpeed: 30, attackAngle: -4, ballSpeed: 24, spin: 9000, carry: 40, side: 0 },   // smash 0.8 → bad strike (floor 1.15)
+    { clubSpeed: 30, attackAngle: -4, ballSpeed: 34.5, spin: 2000, carry: 15, side: 0 }, // low spin+carry but N<6, no history
+  ] };
+const q13 = quarantineClub([tiny]);
+chk('T13 shot0 quarantined (smash floor)', q13[0].shots[0].quarantined === true && q13[0].shots[0].quarantineReason === 'bad_strike');
+chk('T13 shot1 NOT quarantined (thin-flier rule skipped, no stable reference)', q13[0].shots[1].quarantined === false);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
