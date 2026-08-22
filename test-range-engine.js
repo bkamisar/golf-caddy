@@ -263,4 +263,24 @@ const q13 = quarantineClub([tiny]);
 chk('T13 shot0 quarantined (smash floor)', q13[0].shots[0].quarantined === true && q13[0].shots[0].quarantineReason === 'bad_strike');
 chk('T13 shot1 NOT quarantined (thin-flier rule skipped, no stable reference)', q13[0].shots[1].quarantined === false);
 
+// T16. Regression: stability must gate on the count of shots with USABLE
+// (non-null) spin AND carry, not the raw shot count. 6 shots (raw count meets
+// MIN_SHOTS_STABLE) but only 2 have real spin/carry — a partial-column
+// launch-monitor export. Pre-fix, the raw-count gate passed and the median
+// was computed from just those 2 values; with n=2 the median sits exactly
+// between them, so the smaller-spin/smaller-carry shot got flagged
+// thin_flier as an artifact of an unstably small sample, not a real anomaly.
+const sixShotsThinData = { date: '2026-08-02', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+  shots: [
+    { smash: 1.3, spin: 6000, carry: 150, side: 0 },   // real data, normal
+    { smash: 1.3, spin: 1900, carry: 90, side: 0 },    // real data, lower spin+carry — must NOT be flagged
+    { smash: 1.3, spin: null, carry: null, side: 0 },  // missing spin/carry (partial-column export)
+    { smash: 1.3, spin: null, carry: null, side: 0 },
+    { smash: 1.3, spin: null, carry: null, side: 0 },
+    { smash: 1.3, spin: null, carry: null, side: 0 },
+  ] };
+const q16 = quarantineClub([sixShotsThinData]);
+chk('T16 raw shot count (6) meets MIN_SHOTS_STABLE but only 2 have usable spin/carry', sixShotsThinData.shots.length === 6);
+chk('T16 shot1 (lower spin+carry) NOT quarantined as thin_flier (reference correctly deemed unstable)', q16[0].shots[1].quarantined === false && q16[0].shots[1].quarantineReason !== 'thin_flier');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
