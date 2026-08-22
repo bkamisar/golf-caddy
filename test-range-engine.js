@@ -86,4 +86,32 @@ chk('T4 no date line → findDate returns null', date4 === null);
 const club4 = findClubCode(noDateLines, h4.idx, -1);
 chk('T4 club code still found without date', club4 === '7i');
 
+// T5. Full parseTrackman on the real 7-iron sample
+const p5 = parseTrackman(SAMPLE_7I);
+chk('T5 one session parsed', p5.sessions.length === 1);
+const s5 = p5.sessions[0];
+chk('T5 date correct', s5.date === '2026-08-22');
+chk('T5 club is 7-Iron', s5.club.name === '7-Iron');
+chk('T5 12 shots parsed', s5.shots.length === 12);
+chk('T5 date not assumed', s5.dateAssumed === false);
+// shot 1: 31.9 clubSpeed, 3.0 attack, 42.3 ballSpeed, 5390 spin, 116.0 carry, 8.4L → side -8.4
+chk('T5 shot1 clubSpeed', s5.shots[0].clubSpeed === 31.9);
+chk('T5 shot1 side is negative (L)', s5.shots[0].side === -8.4);
+// shot 2: 21.6R → side +21.6
+chk('T5 shot2 side is positive (R)', s5.shots[1].side === 21.6);
+chk('T5 shot2 carry', s5.shots[1].carry === 69.8);
+chk('T5 no skipped noise lines leak into shots', s5.shots.every(s => s.clubSpeed > 20 && s.clubSpeed < 50));
+chk('T5 nothing unparseable left over', p5.skipped.length === 0);
+
+// T6. Footer self-check: reported average present and matches computed mean
+chk('T6 check produced', p5.checks.length === 1);
+chk('T6 check reports ok (paste matches its own footer)', p5.checks[0].ok === true);
+
+// T7. Deliberately corrupted paste (one shot's carry manually altered far from
+// the stated Average) → self-check must catch it
+const corrupted = SAMPLE_7I.replace('31.9\t3.0\t42.3\t5390\t116.0\t8.4L', '31.9\t3.0\t42.3\t5390\t400.0\t8.4L');
+const p7 = parseTrackman(corrupted);
+chk('T7 corrupted paste flagged not ok', p7.checks[0].ok === false);
+chk('T7 mismatch names carry', p7.checks[0].mismatches.some(m => m.key === 'carry'));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

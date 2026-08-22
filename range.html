@@ -215,6 +215,114 @@ function findClubCode(lines, headerIdx, dateIdx) {
   }
   return null;
 }
+
+// ── Trackman shot-row and footer parsing ──────────────────────────────────────
+function parseSideToken(tok) {
+  const m = String(tok).trim().match(/^(-?\d+\.?\d*)\s*([LR])?$/i);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  if (isNaN(v)) return null;
+  return (m[2] && m[2].toUpperCase() === 'L') ? -v : v;
+}
+function parseNum(tok) { const v = parseFloat(tok); return isNaN(v) ? null : v; }
+
+// A shot row's non-empty tab-split tokens must exactly match the column count.
+// Icon/index noise lines never have this shape and fall through untouched.
+function tryParseShotRow(line, cols) {
+  const toks = splitCells(line).filter(t => t !== '');
+  if (toks.length !== cols.length) return null;
+  const shot = {};
+  for (let i = 0; i < cols.length; i++) {
+    const key = cols[i], tok = toks[i];
+    const v = key === 'side' ? parseSideToken(tok) : parseNum(tok);
+    if (v === null) return null;
+    shot[key] = v;
+  }
+  return shot;
+}
+// Average/Consistency rows carry a label and sometimes an icon placeholder
+// token before the numbers — filter to numeric-shaped tokens and take the
+// last N (N = column count), which sidesteps the label/icon entirely.
+function parseFooterRow(line, cols) {
+  const label = (line.match(/^(Average|Consistency)\b/i) || [])[1];
+  if (!label) return null;
+  const toks = splitCells(line).filter(t => t !== '');
+  const nums = toks.filter(t => parseSideToken(t) !== null || !isNaN(parseFloat(t)));
+  const vals = nums.slice(-cols.length);
+  if (vals.length !== cols.length) return null;
+  const row = {};
+  for (let i = 0; i < cols.length; i++) {
+    const key = cols[i];
+    row[key] = key === 'side' ? parseSideToken(vals[i]) : parseNum(vals[i]);
+  }
+  return { label: label.toLowerCase(), row };
+}
+function normalizeShotUnits(shot, units) {
+  const s = { ...shot };
+  const dFactor = units.distance === 'yd' ? (1 / M_TO_YD) : 1;
+  const vFactor = units.speed === 'mph' ? (1 / MS_TO_MPH) : 1;
+  ['carry', 'total', 'side', 'height'].forEach(k => { if (s[k] != null) s[k] = s[k] * dFactor; });
+  ['clubSpeed', 'ballSpeed'].forEach(k => { if (s[k] != null) s[k] = s[k] * vFactor; });
+  return s;
+}
+// Compares the session's own computed column means against Trackman's stated
+// Average row. A mismatch beyond tolerance means the parse likely misread this
+// specific paste — shown as a data-quality verdict, not silently trusted.
+function checkAgainstReported(session, reportedAverage) {
+  const mismatches = [];
+  Object.keys(reportedAverage).forEach(k => {
+    const rv = reportedAverage[k];
+    if (rv == null) return;
+    const vals = session.shots.map(s => s[k]).filter(v => v != null);
+    if (!vals.length) return;
+    const cm = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const tol = Math.max(Math.abs(rv) * 0.08, 0.5);
+    if (Math.abs(cm - rv) > tol) mismatches.push({ key: k, reported: r1(rv), computed: r1(cm) });
+  });
+  return { date: session.date, club: session.club.name, ok: mismatches.length === 0, mismatches };
+}
+
+function parseTrackman(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim() !== '');
+  const h = findHeaderCols(lines);
+  if (!h) return { sessions: [], skipped: [text], checks: [] };
+  const { idx: headerIdx, cols } = h;
+  const unitRow = findUnitRow(lines, headerIdx, cols.length);
+  const units = unitsFromRow(cols, unitRow);
+  const dateInfo = findDate(lines, headerIdx);
+  const dateAssumed = !dateInfo;
+  const date = dateInfo ? dateInfo.date : new Date().toISOString().slice(0, 10);
+  const clubCode = findClubCode(lines, headerIdx, dateInfo ? dateInfo.idx : -1) || '';
+  const club = canonicalClub(clubCode);
+
+  let scanFrom = headerIdx + 1;
+  for (let i = headerIdx + 1; i < Math.min(lines.length, headerIdx + 4); i++) {
+    const toks = splitCells(lines[i]).filter(t => t);
+    if (toks.length === cols.length && toks.every(t => /^(m\/s|mph|deg|rpm|m|yds?|kph)$/i.test(t))) {
+      scanFrom = i + 1; break;
+    }
+  }
+
+  const shots = [], skipped = [];
+  let reportedAverage = null;
+  for (let i = scanFrom; i < lines.length; i++) {
+    const line = lines[i];
+    const footer = parseFooterRow(line, cols);
+    if (footer) {
+      if (footer.label === 'average') reportedAverage = normalizeShotUnits(footer.row, units);
+      continue;
+    }
+    const shot = tryParseShotRow(line, cols);
+    if (shot) { shots.push(normalizeShotUnits(shot, units)); continue; }
+    if (/icon/i.test(line) || /^\d+\.$/.test(line.trim())) continue; // known noise
+    skipped.push(line);
+  }
+  if (!shots.length) return { sessions: [], skipped: [text], checks: [] };
+
+  const session = { date, dateAssumed, clubCode, club, tags: {}, shots };
+  const checks = reportedAverage ? [checkAgainstReported(session, reportedAverage)] : [];
+  return { sessions: [session], skipped, checks };
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
