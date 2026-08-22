@@ -20,6 +20,7 @@ These resolve ambiguity the spec left at the "how" level; later tasks assume the
 2. **Trackman's `Average`/`Consistency` footer is used only as a same-turn parse self-check.** It is never stored long-term (merging two pastes of the same club-session makes any single footer stale). `doParse()` shows a warning immediately if the computed mean disagrees with the footer; nothing about later rendering depends on it.
 3. **Quarantine and trend both operate on `club-session groups`** — all stored sessions for one club, sorted by date — computed fresh on every render (same philosophy as `index.html`'s `enrich()`/`computeMetrics()` recomputing everything from raw rounds each time, never caching derived state).
 4. **Column alignment differs per adapter.** Trackman's paste has a header row with a leading garbage cell that data rows don't have, so position-based column mapping is unsafe. The `trackman` adapter matches columns by keyword **in left-to-right order of appearance**, then zips that ordered key list against each data row's non-empty tokens by position-in-row (not raw index). The `generic` adapter is a well-formed table, so it uses raw column-index mapping like `index.html`'s `parseGeneric` does.
+5. **`var`, not `const`, for any top-level engine binding a test references by bare name.** Discovered during Task 1: the test harness's `eval(...)` call only leaks `var`/`function` declarations into the calling scope (per JS spec) — `const`/`let` stay trapped inside the eval's own lexical environment, even though the eval call is direct. `index.html`'s `test-engine.js` never hit this because it only ever calls `function`-declared helpers, never a `const`-declared value directly. In this plan, every engine-block value tested by bare name (`M_TO_YD`, `MS_TO_MPH`, `median`, `mean`, `r1`, `SOURCES`) is written as `var`, not `const`. Function declarations (`function foo() {}`) are unaffected and need no special handling — only non-function `const`/arrow-function bindings referenced directly (not through a wrapping function call) need this. If a later task adds a new top-level `const` that a test then references by bare name, apply the same fix.
 
 ---
 
@@ -703,7 +704,10 @@ function parseGenericLM(text) {
   return { sessions: Object.values(byKey), skipped, checks: [] };
 }
 
-const SOURCES = {
+// var, not const: T9 references SOURCES by bare name outside the eval() that
+// loads this block, and direct eval only leaks var/function declarations to
+// the caller's scope, never const/let (see Task 1's finding on this exact issue).
+var SOURCES = {
   trackman: { label: 'Trackman (range table)', parse: parseTrackman },
   generic:  { label: 'Other launch monitor (CSV/table)', parse: parseGenericLM },
 };
