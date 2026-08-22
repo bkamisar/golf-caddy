@@ -137,6 +137,84 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// ── Trackman paste parsing infrastructure ─────────────────────────────────────
+// Metric keywords, in the priority order used to identify a column. Order here
+// does NOT determine output column order — the header's left-to-right order does.
+const METRIC_KEYWORDS = [
+  { key:'clubSpeed',   kws:['club speed'] },
+  { key:'attackAngle', kws:['attack ang'] },
+  { key:'ballSpeed',   kws:['ball speed'] },
+  { key:'spin',        kws:['spin rate', 'spin'] },
+  { key:'launch',      kws:['launch ang'] },
+  { key:'carry',       kws:['carry'] },
+  { key:'total',       kws:['total'] },
+  { key:'side',        kws:['side'] },
+  { key:'height',      kws:['height', 'apex'] },
+  { key:'curve',       kws:['curve'] },
+  { key:'smash',       kws:['smash'] },
+];
+function splitCells(line) { return line.split('\t').map(c => c.trim()); }
+
+// Finds the header line by scanning for known metric keywords. Column order in
+// the RESULT follows the order keywords appear in the line, NOT their raw cell
+// index — Trackman's header has a leading garbage cell that data rows lack, so
+// index-based alignment would be wrong (see design decision #4 above).
+function findHeaderCols(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const cells = splitCells(lines[i]);
+    const cols = [];
+    cells.forEach(cell => {
+      const h = cell.toLowerCase();
+      if (!h) return;
+      for (const m of METRIC_KEYWORDS) {
+        if (m.kws.some(k => h.includes(k))) { cols.push(m.key); return; }
+      }
+    });
+    if (cols.includes('clubSpeed') && cols.includes('ballSpeed') && cols.includes('carry'))
+      return { idx: i, cols };
+  }
+  return null;
+}
+
+// The unit row is within a few lines after the header and has exactly N
+// unit-shaped tokens (m/s, mph, deg, rpm, m, yds).
+function findUnitRow(lines, headerIdx, n) {
+  for (let i = headerIdx + 1; i < Math.min(lines.length, headerIdx + 4); i++) {
+    const toks = splitCells(lines[i]).filter(t => t);
+    if (toks.length === n && toks.every(t => /^(m\/s|mph|deg|rpm|m|yds?|kph)$/i.test(t)))
+      return toks;
+  }
+  return null;
+}
+function unitsFromRow(cols, unitRow) {
+  if (!unitRow) return { distance: 'm', speed: 'm/s' };
+  const ci = cols.indexOf('carry'), si = cols.indexOf('clubSpeed');
+  const distance = ci >= 0 && /yd/i.test(unitRow[ci]) ? 'yd' : 'm';
+  const speed = si >= 0 && /mph/i.test(unitRow[si]) ? 'mph' : 'm/s';
+  return { distance, speed };
+}
+
+// Date is a bare ISO line (Trackman's own format) above the header.
+function findDate(lines, headerIdx) {
+  for (let i = 0; i < headerIdx; i++) {
+    const m = lines[i].trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return { date: lines[i].trim(), idx: i };
+  }
+  return null;
+}
+// Club code: first non-empty, non-icon, non-date line above the header. The
+// nickname line that follows it is deliberately ignored (design Q&A: parse
+// the short code, not the user's custom nickname).
+function findClubCode(lines, headerIdx, dateIdx) {
+  for (let i = 0; i < headerIdx; i++) {
+    if (i === dateIdx) continue;
+    const l = lines[i].trim();
+    if (!l || /icon/i.test(l)) continue;
+    return l;
+  }
+  return null;
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
