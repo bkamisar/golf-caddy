@@ -864,8 +864,12 @@ Insert after the `SOURCES` registry, before `/*ENGINE-END*/`:
 ```js
 // ── Merge: same date + same club = one club-session; shots dedup exactly ─────
 function shotKey(s) {
+  // 1 decimal, not 3: matches Trackman's actual display precision (e.g. 31.9,
+  // 116.0, 8.4 in real paste data), and coarser rounding is more robust to
+  // unit-conversion round-trip noise (yards<->meters) without risking
+  // false-positive collisions between genuinely different shots.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
-    .map(k => s[k] == null ? '' : s[k].toFixed(3)).join('|');
+    .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
 }
 function mergeClubSessions(existing, incoming) {
   const key = cs => `${cs.date}|${cs.club.name}`;
@@ -875,7 +879,7 @@ function mergeClubSessions(existing, incoming) {
   incoming.forEach(cs => {
     const k = key(cs);
     if (!map[k]) {
-      map[k] = { ...cs, shots: [...cs.shots] };
+      map[k] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } };
       addedShots += cs.shots.length;
     } else {
       const seen = new Set(map[k].shots.map(shotKey));
@@ -892,6 +896,12 @@ function mergeClubSessions(existing, incoming) {
 }
 ```
 
+Note: `tags: { ...cs.tags }` on the wholesale-add branch (not just `...cs`) is
+deliberate — a plain `{...cs, shots:[...cs.shots]}` would alias `tags` to the
+same object reference as the caller's incoming session, a shared-mutation
+hazard caught in code review. The merge branch already clones tags safely via
+its own spread.
+
 - [ ] **Step 4: Run to verify all tests pass**
 
 Run: `node test-range-engine.js`
@@ -902,6 +912,61 @@ Expected: `ALL PASS`.
 ```bash
 git add range.html test-range-engine.js
 git commit -m "Add mergeClubSessions with date+club keying and shot-level dedup"
+```
+
+- [ ] **Step 6: Fixes from code review — tag precedence test + partial-dedup test**
+
+Code review confirmed the implementation matches spec and passes, but flagged
+two untested behaviors that are easy to silently break later: the tag-merge
+precedence (`{...cs.tags, ...map[k].tags}` — existing session wins on conflict
+— reads confusingly, since it looks like it should favor the incoming
+argument), and partial/mixed dedup (current tests only cover 100%-new and
+100%-duplicate re-pastes, never a re-paste with SOME overlap — the realistic
+"accumulate history" case).
+
+Append to `test-range-engine.js`:
+
+```js
+// T12. Tag merge precedence: on a same date+club merge, the EXISTING
+// (pre-existing map[k]) session's tags must win over the incoming session's
+// tags on key conflict. `{ ...cs.tags, ...map[k].tags }` reads like it favors
+// cs (the incoming argument) but actually favors map[k] because later spread
+// keys win — code review flagged this as easy to accidentally invert.
+const clubT12 = canonicalClub('7i');
+const existingT12 = [{ date: '2026-08-15', club: clubT12, tags: { note: 'existing-note' },
+  shots: [{ clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 }] }];
+const incomingT12 = [{ date: '2026-08-15', club: clubT12, tags: { note: 'incoming-note' },
+  shots: [{ clubSpeed: 91.0, ballSpeed: 121.0, carry: 147.0, side: 2.4 }] }];
+const m12 = mergeClubSessions(existingT12, incomingT12);
+chk('T12 tag merge precedence: existing session tag value wins over incoming on conflict', m12.all[0].tags.note === 'existing-note');
+
+// T13. Partial/mixed dedup: a re-paste where SOME shots already exist and
+// SOME are genuinely new (the realistic "accumulate history" case) — only
+// the genuinely-new shots should be counted/added, not double-counted and
+// not dropped.
+const clubT13 = canonicalClub('7i');
+const dupShotA = { clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 };
+const dupShotB = { clubSpeed: 91.0, ballSpeed: 121.0, carry: 147.0, side: 2.4 };
+const existingT13 = [{ date: '2026-08-15', club: clubT13, tags: {},
+  shots: [dupShotA, dupShotB, { clubSpeed: 89.0, ballSpeed: 118.0, carry: 140.0, side: 0.0 }] }];
+const incomingT13 = [{ date: '2026-08-15', club: clubT13, tags: {},
+  shots: [
+    { clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 }, // duplicate of dupShotA (same values, new object)
+    { clubSpeed: 91.0, ballSpeed: 121.0, carry: 147.0, side: 2.4 },  // duplicate of dupShotB
+    { clubSpeed: 95.0, ballSpeed: 130.0, carry: 155.0, side: 5.0 },  // genuinely new
+    { clubSpeed: 96.0, ballSpeed: 131.0, carry: 157.0, side: -2.0 }, // genuinely new
+  ] }];
+const m13 = mergeClubSessions(existingT13, incomingT13);
+chk('T13 partial dedup: addedShots counts only the genuinely-new shots', m13.addedShots === 2);
+chk('T13 partial dedup: final shot count is 3 existing + 2 new, not double-counted or missing', m13.all[0].shots.length === 5);
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`, all prior tests unaffected.
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Code-review fixes for Task 5 merge (shotKey precision, tags aliasing, coverage)"
 ```
 
 ---
