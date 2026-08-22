@@ -361,4 +361,15 @@ const thin20 = [
 const t20 = computeTrend(groupByClub(thin20)[0].sessions);
 chk('T20 not enough with thin shot counts', t20.enough === false);
 
+// T21. computeTrend must not trust caller order: feed it the SAME 5-session
+// history as T17 (post-quarantine, via groups17[0].sessions) but reversed.
+// computeTrend's own defensive sort should recover the correct recent/baseline
+// split, producing byte-for-byte identical results to T17's correctly-ordered call.
+const shuffled17 = [...groups17[0].sessions].reverse();
+const t21 = computeTrend(shuffled17);
+chk('T21 reversed input still enough data', t21.enough === t17.enough);
+chk('T21 reversed input: same recent carry as T17', t21.carry.recent === t17.carry.recent);
+chk('T21 reversed input: same baseline carry as T17', t21.carry.baseline === t17.carry.baseline);
+chk('T21 reversed input: same caveat as T17', t21.caveat === t17.caveat);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

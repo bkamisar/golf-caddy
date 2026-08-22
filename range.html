@@ -563,6 +563,11 @@ function computeGapping(groups) {
 // where the club wasn't hit are absent from the array entirely, so a club hit
 // on 5 visits gets a full window even with other clubs' visits interleaved.
 function computeTrend(sessions) {
+  // Defensive sort: don't trust caller order. groupByClub sorts before calling
+  // us today, but index.html shipped this exact bug once (commit 9ba2fc4) —
+  // an unsorted array here would silently swap "recent" vs "baseline" and
+  // produce an inverted-but-plausible-looking trend verdict.
+  sessions = [...sessions].sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
   const n = sessions.length;
   if (n < 3) return { enough: false, reason: 'not enough sessions' };
   const recent = sessions.slice(-2);
