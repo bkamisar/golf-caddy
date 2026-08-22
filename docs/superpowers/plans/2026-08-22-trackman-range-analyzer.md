@@ -654,6 +654,28 @@ function parseDateLoose(s) {
   if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${p2(m[1])}-${p2(m[2])}`;
   return s || '0000-00-00';
 }
+// Other launch monitors typically export spelled-out club names ("7 Iron",
+// "Pitching Wedge") rather than Trackman's short codes ("7i", "PW"). CLUB_TABLE
+// already accepts the spelled-out word for Driver (its regex includes "driver"),
+// but the numbered classes only match short codes — T8's "7 Iron" test data
+// would otherwise fall through to canonicalClub's unknown-code fallback. This
+// translates common long forms to short codes before handing off to
+// canonicalClub, deliberately left OUT of the shared CLUB_TABLE so it doesn't
+// affect the Trackman adapter (which only ever emits short codes).
+function normalizeClubCode(raw) {
+  const s = (raw || '').trim();
+  let m = s.match(/^(\d+)\s*-?\s*iron$/i);
+  if (m) return m[1] + 'i';
+  m = s.match(/^(\d+)\s*-?\s*wood$/i);
+  if (m) return m[1] + 'w';
+  m = s.match(/^(\d+)\s*-?\s*hybrid$/i);
+  if (m) return m[1] + 'h';
+  if (/^pitching\s*-?\s*wedge$/i.test(s)) return 'pw';
+  if (/^(gap|approach)\s*-?\s*wedge$/i.test(s)) return 'gw';
+  if (/^sand\s*-?\s*wedge$/i.test(s)) return 'sw';
+  if (/^lob\s*-?\s*wedge$/i.test(s)) return 'lw';
+  return s;
+}
 function parseGenericLM(text) {
   const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
   if (lines.length < 2) return { sessions: [], skipped: [], checks: [] };
@@ -691,7 +713,7 @@ function parseGenericLM(text) {
     const clubCode = col.club >= 0 ? c[col.club] : '';
     if (!clubCode || (col.clubSpeed < 0 && col.ballSpeed < 0 && col.carry < 0)) { skipped.push(line); return; }
     const date = parseDateLoose(col.date >= 0 ? c[col.date] : '');
-    const club = canonicalClub(clubCode);
+    const club = canonicalClub(normalizeClubCode(clubCode));
     const shot = {
       clubSpeed: num(c, col.clubSpeed), attackAngle: num(c, col.attackAngle),
       ballSpeed: num(c, col.ballSpeed), spin: num(c, col.spin), launch: num(c, col.launch),
