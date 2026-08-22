@@ -114,4 +114,21 @@ const p7 = parseTrackman(corrupted);
 chk('T7 corrupted paste flagged not ok', p7.checks[0].ok === false);
 chk('T7 mismatch names carry', p7.checks[0].mismatches.some(m => m.key === 'carry'));
 
+// T8. Generic launch-monitor CSV fallback (well-formed, index-based mapping)
+const genCsv = `Date,Club,Club Speed,Ball Speed,Spin Rate,Carry,Side\n` +
+  `2026-08-15,7 Iron,90.5,120.3,6200,145.2,-3.1\n` +
+  `2026-08-15,7 Iron,91.0,121.0,6100,147.0,2.4\n` +
+  `2026-08-15,Driver,105.2,155.0,2400,240.0,5.0`;
+const p8 = parseGenericLM(genCsv);
+chk('T8 two club-sessions grouped (7 Iron, Driver)', p8.sessions.length === 2);
+const s8seven = p8.sessions.find(s => s.club.name === '7-Iron');
+chk('T8 7-Iron session has 2 shots', s8seven && s8seven.shots.length === 2);
+chk('T8 date parsed', s8seven && s8seven.date === '2026-08-15');
+chk('T8 side numeric passthrough (no L/R suffix needed)', s8seven && s8seven.shots[0].side === -3.1);
+
+// T9. SOURCES registry wires both adapters
+chk('T9 trackman source present', typeof SOURCES.trackman.parse === 'function');
+chk('T9 generic source present', typeof SOURCES.generic.parse === 'function');
+chk('T9 trackman source parses the sample', SOURCES.trackman.parse(SAMPLE_7I).sessions.length === 1);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

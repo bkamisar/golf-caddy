@@ -323,6 +323,96 @@ function parseTrackman(text) {
   const checks = reportedAverage ? [checkAgainstReported(session, reportedAverage)] : [];
   return { sessions: [session], skipped, checks };
 }
+
+// ── Generic adapter: any launch monitor export with a header row ─────────────
+// Well-formed table (unlike Trackman's paste), so columns are found by keyword
+// once and then read by raw index — same approach as index.html's parseGeneric.
+const p2 = x => String(x).padStart(2, '0');
+function parseDateLoose(s) {
+  s = (s || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${p2(m[2])}-${p2(m[3])}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${p2(m[1])}-${p2(m[2])}`;
+  return s || '0000-00-00';
+}
+// Other launch monitors typically export spelled-out club names ("7 Iron",
+// "Pitching Wedge") rather than Trackman's short codes ("7i", "PW"). CLUB_TABLE
+// already accepts the spelled-out word for Driver (re includes "driver"), but
+// the numbered classes only match short codes — so translate common long forms
+// to short codes here before handing off to canonicalClub, leaving CLUB_TABLE
+// (shared with the Trackman adapter) untouched.
+function normalizeClubCode(raw) {
+  const s = (raw || '').trim();
+  let m = s.match(/^(\d+)\s*-?\s*iron$/i);
+  if (m) return m[1] + 'i';
+  m = s.match(/^(\d+)\s*-?\s*wood$/i);
+  if (m) return m[1] + 'w';
+  m = s.match(/^(\d+)\s*-?\s*hybrid$/i);
+  if (m) return m[1] + 'h';
+  if (/^pitching\s*-?\s*wedge$/i.test(s)) return 'pw';
+  if (/^(gap|approach)\s*-?\s*wedge$/i.test(s)) return 'gw';
+  if (/^sand\s*-?\s*wedge$/i.test(s)) return 'sw';
+  if (/^lob\s*-?\s*wedge$/i.test(s)) return 'lw';
+  return s;
+}
+function parseGenericLM(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
+  if (lines.length < 2) return { sessions: [], skipped: [], checks: [] };
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+  const split = l => {
+    if (delim === '\t') return l.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      if (ch === '"') { if (q && l[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === ',' && !q) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map(c => c.trim());
+  };
+  const H = split(lines[0]).map(h => h.toLowerCase());
+  const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  const col = {
+    date: find('date'), club: find('club'),
+    clubSpeed: find('club speed', 'clubhead speed'), attackAngle: find('attack'),
+    ballSpeed: find('ball speed'), spin: find('spin'), launch: find('launch'),
+    carry: find('carry'), total: find('total'), side: find('side', 'offline'),
+    height: find('height', 'apex'), smash: find('smash'),
+  };
+  const num = (c, i) => {
+    if (i < 0 || c[i] === undefined || c[i] === '') return null;
+    const v = parseFloat(String(c[i]).replace('%', ''));
+    return isNaN(v) ? null : v;
+  };
+  const side = (c, i) => (i < 0 || c[i] === undefined || c[i] === '') ? null : parseSideToken(c[i]);
+  const skipped = [], byKey = {};
+  lines.slice(1).forEach(line => {
+    const c = split(line);
+    const clubCode = col.club >= 0 ? c[col.club] : '';
+    if (!clubCode || (col.clubSpeed < 0 && col.ballSpeed < 0 && col.carry < 0)) { skipped.push(line); return; }
+    const date = parseDateLoose(col.date >= 0 ? c[col.date] : '');
+    const club = canonicalClub(normalizeClubCode(clubCode));
+    const shot = {
+      clubSpeed: num(c, col.clubSpeed), attackAngle: num(c, col.attackAngle),
+      ballSpeed: num(c, col.ballSpeed), spin: num(c, col.spin), launch: num(c, col.launch),
+      carry: num(c, col.carry), total: num(c, col.total), side: side(c, col.side),
+      height: num(c, col.height), smash: num(c, col.smash),
+    };
+    const key = `${date}|${club.name}`;
+    (byKey[key] = byKey[key] || { date, dateAssumed: col.date < 0, clubCode, club, tags: {}, shots: [] }).shots.push(shot);
+  });
+  return { sessions: Object.values(byKey), skipped, checks: [] };
+}
+
+// var, not const: T9 references SOURCES by bare name outside the eval() that
+// loads this block, and direct eval only leaks var/function declarations to
+// the caller's scope, never const/let (see Task 1's finding on this exact issue).
+var SOURCES = {
+  trackman: { label: 'Trackman (range table)', parse: parseTrackman },
+  generic:  { label: 'Other launch monitor (CSV/table)', parse: parseGenericLM },
+};
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
