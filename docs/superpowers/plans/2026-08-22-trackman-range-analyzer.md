@@ -1124,6 +1124,17 @@ function smashFactor(shot) {
   if (shot.ballSpeed != null && shot.clubSpeed) return shot.ballSpeed / shot.clubSpeed;
   return null;
 }
+// A reference is "stable" when it has enough shots with USABLE (non-null)
+// spin AND carry to trust a median computed from them — not merely enough
+// raw shots. A session can have plenty of shots but only a couple with real
+// spin/carry (e.g. a partial-column launch-monitor export); gating on raw
+// count would let a 2-value "median" masquerade as a 6-shot-stable one.
+function stableRef(shots) {
+  const spins = shots.map(s => s.spin).filter(v => v != null);
+  const carries = shots.map(s => s.carry).filter(v => v != null);
+  return (spins.length >= MIN_SHOTS_STABLE && carries.length >= MIN_SHOTS_STABLE)
+    ? { medSpin: median(spins), medCarry: median(carries) } : null;
+}
 // sessions: all stored club-sessions for ONE club, any order. Returns the same
 // shape with each shot annotated { smash, quarantined, quarantineReason }.
 // Reference medians for the thin-flier rule fall back session→cross-session→
@@ -1136,14 +1147,14 @@ function quarantineClub(sessions) {
 
   return sessions.map(sess => {
     // Reference for the thin-flier medians: this session's own shots if there
-    // are enough to trust; otherwise the pooled cross-session history for this
-    // club IF that pool itself has enough shots; otherwise null, which disables
-    // the thin-flier check entirely (medSpin/medCarry stay null below) rather
-    // than computing an "unstable" median from too few shots either way.
-    const ref = sess.shots.length >= MIN_SHOTS_STABLE ? sess.shots
-              : (allShots.length >= MIN_SHOTS_STABLE ? allShots : null);
-    const medSpin = ref ? median(ref.map(s => s.spin).filter(v => v != null)) : null;
-    const medCarry = ref ? median(ref.map(s => s.carry).filter(v => v != null)) : null;
+    // are enough with usable spin/carry to trust; otherwise the pooled
+    // cross-session history for this club IF that pool itself has enough
+    // usable shots; otherwise null, which disables the thin-flier check
+    // entirely (medSpin/medCarry stay null below) rather than computing an
+    // "unstable" median from too few shots either way.
+    const own = stableRef(sess.shots);
+    const pooled = own ? null : stableRef(allShots);
+    const { medSpin, medCarry } = own || pooled || { medSpin: null, medCarry: null };
     const shots = sess.shots.map(s => {
       const sm = smashFactor(s);
       const badStrike = sm != null && sm < floor;
@@ -1152,12 +1163,18 @@ function quarantineClub(sessions) {
       const reason = badStrike ? 'bad_strike' : (thinFlier ? 'thin_flier' : null);
       return { ...s, smash: sm, quarantined: !!reason, quarantineReason: reason };
     });
-    return { ...sess, shots };
+    return { ...sess, tags: { ...sess.tags }, shots };
   });
 }
 ```
 
-Note on Step 3: the `ref`/`medSpin`/`medCarry` logic above has a subtlety worth getting right — when a session has fewer than `MIN_SHOTS_STABLE` shots, it falls back to the pooled `allShots` **only if** `allShots.length >= MIN_SHOTS_STABLE`. If the pooled cross-session history is itself thin (as in the `SW` test: one 2-shot session, no other history, so `allShots` is the same 2 shots), `ref` must end up `null` — do **not** add a further fallback that computes a median from `allShots` anyway in that case; that defeats the entire point and turns "skip the rule when there's no stable reference" into "use an unstable 2-shot reference," which is exactly the bug T13 exists to catch.
+Note on Step 3: the stability gate must count shots with **usable (non-null)
+spin AND carry**, not raw shot count — a session can have 6+ shots by count
+but only 2 with real spin/carry (e.g. a partial-column export), and gating on
+raw count would let an unstable 2-value median masquerade as a stable one.
+`tags: { ...sess.tags }` on the return (not just `...sess`) is likewise
+deliberate — the same aliasing hazard `mergeClubSessions` was fixed for in
+Task 5, reintroduced here and caught in this task's own code review.
 
 - [ ] **Step 4: Run to verify all tests pass**
 
@@ -1169,6 +1186,51 @@ Expected: `ALL PASS`.
 ```bash
 git add range.html test-range-engine.js
 git commit -m "Add quarantineClub: bad-strike/thin-flier mishit detection with fallback references"
+```
+
+- [ ] **Step 6: Fixes from code review — stability gate + tags aliasing**
+
+Code review found two issues in the Step 3 code above (already corrected in
+that code block, but called out explicitly here since they were caught after
+initial implementation): the stability gate originally checked raw shot count
+(`sess.shots.length >= MIN_SHOTS_STABLE`) instead of the count of shots with
+usable spin/carry data, which could let an unstable 2-value median pass as
+"stable" given 6+ total shots with mostly-null spin/carry; and the return
+statement originally did `{ ...sess, shots }`, aliasing `tags` to the same
+object reference as the input — the identical bug class `mergeClubSessions`
+was fixed for in Task 5.
+
+Append a regression test for the stability-gate fix:
+
+```js
+// T16. Regression: stability must gate on the count of shots with USABLE
+// (non-null) spin AND carry, not the raw shot count. 6 shots (raw count meets
+// MIN_SHOTS_STABLE) but only 2 have real spin/carry — a partial-column
+// launch-monitor export. Pre-fix, the raw-count gate passed and the median
+// was computed from just those 2 values; with n=2 the median sits exactly
+// between them, so the smaller-spin/smaller-carry shot got flagged
+// thin_flier as an artifact of an unstably small sample, not a real anomaly.
+const sixShotsThinData = { date: '2026-08-02', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+  shots: [
+    { smash: 1.3, spin: 6000, carry: 150, side: 0 },   // real data, normal
+    { smash: 1.3, spin: 1900, carry: 90, side: 0 },    // real data, lower spin+carry — must NOT be flagged
+    { smash: 1.3, spin: null, carry: null, side: 0 },  // missing spin/carry (partial-column export)
+    { smash: 1.3, spin: null, carry: null, side: 0 },
+    { smash: 1.3, spin: null, carry: null, side: 0 },
+    { smash: 1.3, spin: null, carry: null, side: 0 },
+  ] };
+const q16 = quarantineClub([sixShotsThinData]);
+chk('T16 raw shot count (6) meets MIN_SHOTS_STABLE but only 2 have usable spin/carry', sixShotsThinData.shots.length === 6);
+chk('T16 shot1 (lower spin+carry) NOT quarantined as thin_flier (reference correctly deemed unstable)', q16[0].shots[1].quarantined === false && q16[0].shots[1].quarantineReason !== 'thin_flier');
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`, T12/T13 unchanged (their
+data has no nulls, so the refactor doesn't change their outcome).
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Code-review fixes for Task 6 quarantineClub: gate stability on usable-data count, clone tags"
 ```
 
 ---
