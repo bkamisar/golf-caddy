@@ -204,4 +204,30 @@ const m13 = mergeClubSessions(existingT13, incomingT13);
 chk('T13 partial dedup: addedShots counts only the genuinely-new shots', m13.addedShots === 2);
 chk('T13 partial dedup: final shot count is 3 existing + 2 new, not double-counted or missing', m13.all[0].shots.length === 5);
 
+// T14. Regression: seeding `map` from `existing` must clone tags, not alias
+// them — otherwise mutating a merged session's tags mutates the caller's
+// original input object for any existing session with no matching incoming
+// (the common case: merging one new day's paste against a large persisted
+// history, where most existing sessions aren't touched by `incoming`).
+const clubT14 = canonicalClub('7i');
+const existingT14 = [{ date: '2026-08-15', club: clubT14, tags: { note: 'original' },
+  shots: [{ clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 }] }];
+const m14 = mergeClubSessions(existingT14, []);
+m14.all[0].tags.note = 'mutated';
+chk('T14 existing-only session tags are cloned, not aliased to caller input', existingT14[0].tags.note === 'original');
+
+// T15. Round-trip sanity check: converting a real parsed shot to yd/mph and
+// back through the engine's own conversion functions should still produce
+// the same shotKey at 1-decimal precision. This exercises the code's own
+// round-trip math (multiply then divide by the same constant), not an
+// independent re-paste with independently-rounded source data — it does not
+// prove real cross-unit re-pastes always match, only that the conversion
+// math itself is not lossy beyond 1-decimal rounding.
+const shot15 = s5.shots[0];
+const forward15 = { ...shot15 };
+['carry', 'total', 'side', 'height'].forEach(k => { if (forward15[k] != null) forward15[k] = forward15[k] * M_TO_YD; });
+['clubSpeed', 'ballSpeed'].forEach(k => { if (forward15[k] != null) forward15[k] = forward15[k] * MS_TO_MPH; });
+const roundtrip15 = normalizeShotUnits(forward15, { distance: 'yd', speed: 'mph' });
+chk('T15 round-trip yd/mph -> m/m-s via engine math preserves shotKey at 1 decimal', shotKey(roundtrip15) === shotKey(shot15));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

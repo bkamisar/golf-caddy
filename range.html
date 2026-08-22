@@ -422,16 +422,19 @@ var SOURCES = {
 // ── Merge: same date + same club = one club-session; shots dedup exactly ─────
 function shotKey(s) {
   // 1 decimal, not 3: matches Trackman's actual display precision (e.g. 31.9,
-  // 116.0, 8.4 in real paste data), and coarser rounding is more robust to
-  // unit-conversion round-trip noise (yards<->meters) without risking
-  // false-positive collisions between genuinely different shots.
+  // 116.0, 8.4 in real paste data). This substantially reduces (but does not
+  // fully eliminate) mismatches from unit-conversion round-trip noise
+  // (yards<->meters) if the SAME physical shots are re-pasted after a display-
+  // unit change — a real but likely rare scenario. The tested, common case
+  // (re-pasting identical text) is unaffected: identical input always produces
+  // identical floats regardless of rounding precision.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
     .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
 }
 function mergeClubSessions(existing, incoming) {
   const key = cs => `${cs.date}|${cs.club.name}`;
   const map = {};
-  existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots] }; });
+  existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } }; });
   let addedShots = 0;
   incoming.forEach(cs => {
     const k = key(cs);
