@@ -372,4 +372,32 @@ chk('T21 reversed input: same recent carry as T17', t21.carry.recent === t17.car
 chk('T21 reversed input: same baseline carry as T17', t21.carry.baseline === t17.carry.baseline);
 chk('T21 reversed input: same caveat as T17', t21.caveat === t17.caveat);
 
+// T21. (computeVerdicts) Verdicts fire for a clear carry trend, using the T17 synthetic history
+const groups21 = groupByClub(hist17);
+const gaps21 = computeGapping(groups21);
+const v21 = computeVerdicts(groups21, gaps21, []);
+chk('T21 at least one verdict produced', v21.length > 0);
+chk('T21 carry-up verdict mentions 7-Iron', v21.some(v => v.text.includes('7-Iron') && v.text.toLowerCase().includes('carry')));
+chk('T21 carry verdict is toned good (carry increased)', v21.some(v => v.text.includes('7-Iron') && v.tone === 'good'));
+
+// T22. Gap warning verdict fires for two adjacent clubs pasted too close together
+const tightGapSessions = [
+  { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:32,attackAngle:2,ballSpeed:42,spin:5500,carry:110,side:0})) },
+  { date: '2026-08-01', dateAssumed: false, clubCode: '8i', club: canonicalClub('8i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:31,attackAngle:2,ballSpeed:41,spin:5800,carry:107,side:0})) },
+];
+const groups22 = groupByClub(tightGapSessions);
+const gaps22 = computeGapping(groups22);
+const v22 = computeVerdicts(groups22, gaps22, []);
+chk('T22 tight gap warning present', v22.some(v => v.text.includes('Gap tight')));
+
+// T23. Data-note verdict fires when a check reports a mismatch
+const v23 = computeVerdicts(groups21, gaps21, [{ date: '2026-08-08', club: '7-Iron', ok: false, mismatches: [{key:'carry'}] }]);
+chk('T23 data note verdict present', v23.some(v => v.text.includes('Data note') && v.text.includes('7-Iron')));
+
+// T24. No data at all → placeholder "not enough data" verdict, never empty array
+const v24 = computeVerdicts([], [], []);
+chk('T24 fallback verdict when nothing computable', v24.length === 1 && v24[0].text.includes('Not enough data'));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

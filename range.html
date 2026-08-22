@@ -607,6 +607,48 @@ function computeTrend(sessions) {
     spin:      { recent: med(recentClean, 'spin'),      baseline: med(baselineClean, 'spin') },
   };
 }
+
+// ── Verdicts ───────────────────────────────────────────────────────────────────
+function computeVerdicts(groups, gaps, checks) {
+  const v = [];
+  groups.forEach(g => {
+    const t = computeTrend(g.sessions);
+    if (!t.enough) return;
+    if (t.carry.recent != null && t.carry.baseline != null) {
+      const carryD = (t.carry.recent - t.carry.baseline) * M_TO_YD;
+      if (Math.abs(carryD) >= 3) {
+        v.push({ tone: carryD > 0 ? 'good' : 'bad',
+          text: `<b>${esc(g.name)} carry ${carryD > 0 ? 'up' : 'down'} ${r1(Math.abs(carryD))} yds:</b> last 2 sessions vs previous 3.` +
+                (t.caveat ? ' Session conditions differ or are untagged — ball/weather may explain part of this.' : '') });
+      }
+    }
+    if (t.mishitRate.recent != null && t.mishitRate.baseline != null) {
+      const mrD = (t.mishitRate.baseline - t.mishitRate.recent) * 100;
+      if (Math.abs(mrD) >= 8) {
+        v.push({ tone: mrD > 0 ? 'good' : 'bad',
+          text: `<b>${esc(g.name)} mishit rate ${mrD > 0 ? 'down' : 'up'} ${r1(Math.abs(mrD))}%:</b> ${Math.round(t.mishitRate.recent * 100)}% recent vs ${Math.round(t.mishitRate.baseline * 100)}% previous.` });
+      }
+    }
+    if (t.sideBias.recent != null && Math.abs(t.sideBias.recent) * M_TO_YD >= 5) {
+      v.push({ tone: 'warn',
+        text: `<b>${esc(g.name)} side bias:</b> averaging ${r1(Math.abs(t.sideBias.recent) * M_TO_YD)} yds ${t.sideBias.recent > 0 ? 'right' : 'left'} of target recently.` });
+    }
+  });
+  gaps.forEach((g, i) => {
+    if (!g.gapWarning || g.gapToNext == null) return;
+    const dir = g.gapToNext < 8 ? 'tight' : 'wide';
+    v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(g.gapToNext)} yds apart.` });
+  });
+  (checks || []).filter(c => c && !c.ok).forEach(c => {
+    v.push({ tone: 'flat',
+      text: `<b>Data note:</b> parsed numbers for ${esc(c.club)} on ${esc(c.date)} don't match Trackman's own Average row — this paste may have mis-parsed. Check the shot list.` });
+  });
+  gaps.filter(g => g.lowConfidence).forEach(g => {
+    v.push({ tone: 'flat', text: `<b>Low confidence:</b> ${esc(g.name)} has only ${g.n} clean shot(s) recorded — gapping number is provisional.` });
+  });
+  if (!v.length) v.push({ tone: 'flat', text: 'Not enough data yet for trend verdicts — keep pasting sessions.' });
+  return v;
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
