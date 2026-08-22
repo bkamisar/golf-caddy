@@ -421,8 +421,12 @@ var SOURCES = {
 
 // ── Merge: same date + same club = one club-session; shots dedup exactly ─────
 function shotKey(s) {
+  // 1 decimal, not 3: matches Trackman's actual display precision (e.g. 31.9,
+  // 116.0, 8.4 in real paste data), and coarser rounding is more robust to
+  // unit-conversion round-trip noise (yards<->meters) without risking
+  // false-positive collisions between genuinely different shots.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
-    .map(k => s[k] == null ? '' : s[k].toFixed(3)).join('|');
+    .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
 }
 function mergeClubSessions(existing, incoming) {
   const key = cs => `${cs.date}|${cs.club.name}`;
@@ -432,7 +436,7 @@ function mergeClubSessions(existing, incoming) {
   incoming.forEach(cs => {
     const k = key(cs);
     if (!map[k]) {
-      map[k] = { ...cs, shots: [...cs.shots] };
+      map[k] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } };
       addedShots += cs.shots.length;
     } else {
       const seen = new Set(map[k].shots.map(shotKey));

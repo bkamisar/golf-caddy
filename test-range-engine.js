@@ -171,4 +171,37 @@ const m11 = mergeClubSessions(m10b.all, parseTrackman(driverSample).sessions);
 chk('T11 driver session added separately', m11.all.length === 2);
 chk('T11 sorted driver before 7-iron', m11.all[0].club.name === 'Driver' && m11.all[1].club.name === '7-Iron');
 
+// T12. Tag merge precedence: on a same date+club merge, the EXISTING
+// (pre-existing map[k]) session's tags must win over the incoming session's
+// tags on key conflict. `{ ...cs.tags, ...map[k].tags }` reads like it favors
+// cs (the incoming argument) but actually favors map[k] because later spread
+// keys win — code review flagged this as easy to accidentally invert.
+const clubT12 = canonicalClub('7i');
+const existingT12 = [{ date: '2026-08-15', club: clubT12, tags: { note: 'existing-note' },
+  shots: [{ clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 }] }];
+const incomingT12 = [{ date: '2026-08-15', club: clubT12, tags: { note: 'incoming-note' },
+  shots: [{ clubSpeed: 91.0, ballSpeed: 121.0, carry: 147.0, side: 2.4 }] }];
+const m12 = mergeClubSessions(existingT12, incomingT12);
+chk('T12 tag merge precedence: existing session tag value wins over incoming on conflict', m12.all[0].tags.note === 'existing-note');
+
+// T13. Partial/mixed dedup: a re-paste where SOME shots already exist and
+// SOME are genuinely new (the realistic "accumulate history" case) — only
+// the genuinely-new shots should be counted/added, not double-counted and
+// not dropped.
+const clubT13 = canonicalClub('7i');
+const dupShotA = { clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 };
+const dupShotB = { clubSpeed: 91.0, ballSpeed: 121.0, carry: 147.0, side: 2.4 };
+const existingT13 = [{ date: '2026-08-15', club: clubT13, tags: {},
+  shots: [dupShotA, dupShotB, { clubSpeed: 89.0, ballSpeed: 118.0, carry: 140.0, side: 0.0 }] }];
+const incomingT13 = [{ date: '2026-08-15', club: clubT13, tags: {},
+  shots: [
+    { clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 }, // duplicate of dupShotA (same values, new object)
+    { clubSpeed: 91.0, ballSpeed: 121.0, carry: 147.0, side: 2.4 },  // duplicate of dupShotB
+    { clubSpeed: 95.0, ballSpeed: 130.0, carry: 155.0, side: 5.0 },  // genuinely new
+    { clubSpeed: 96.0, ballSpeed: 131.0, carry: 157.0, side: -2.0 }, // genuinely new
+  ] }];
+const m13 = mergeClubSessions(existingT13, incomingT13);
+chk('T13 partial dedup: addedShots counts only the genuinely-new shots', m13.addedShots === 2);
+chk('T13 partial dedup: final shot count is 3 existing + 2 new, not double-counted or missing', m13.all[0].shots.length === 5);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
