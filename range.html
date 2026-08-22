@@ -374,8 +374,13 @@ function parseGenericLM(text) {
   };
   const H = split(lines[0]).map(h => h.toLowerCase());
   const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  const findClub = () => {
+    const exact = H.findIndex(h => h === 'club' || h === 'club type' || h === 'club name');
+    if (exact >= 0) return exact;
+    return H.findIndex(h => h.includes('club') && !h.includes('speed'));
+  };
   const col = {
-    date: find('date'), club: find('club'),
+    date: find('date'), club: findClub(),
     clubSpeed: find('club speed', 'clubhead speed'), attackAngle: find('attack'),
     ballSpeed: find('ball speed'), spin: find('spin'), launch: find('launch'),
     carry: find('carry'), total: find('total'), side: find('side', 'offline'),

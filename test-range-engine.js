@@ -131,4 +131,30 @@ chk('T9 trackman source present', typeof SOURCES.trackman.parse === 'function');
 chk('T9 generic source present', typeof SOURCES.generic.parse === 'function');
 chk('T9 trackman source parses the sample', SOURCES.trackman.parse(SAMPLE_7I).sessions.length === 1);
 
+// T10a. Regression: club-speed column appearing BEFORE the club-name column
+// must not hijack col.club via substring match ("club speed".includes("club")).
+// Code review (post-1844f9b) found parseGenericLM's find('club') picks the
+// FIRST header cell containing "club", so a header listing Club Speed before
+// Club bound col.club to the speed column, producing a fabricated numeric
+// "club name" like "90.5" with klass 'unknown'.
+const genCsvSpeedFirst = `Date,Club Speed,Club,Ball Speed,Carry\n` +
+  `2026-08-15,90.5,7 Iron,120.3,145.2\n` +
+  `2026-08-15,91.0,7 Iron,121.0,147.0`;
+const p10a = parseGenericLM(genCsvSpeedFirst);
+chk('T10a club column not hijacked by Club Speed column', p10a.sessions.length === 1);
+const s10a = p10a.sessions[0];
+chk('T10a club name is not a numeric string', s10a && !/^\d+(\.\d+)?$/.test(s10a.club.name));
+chk('T10a club correctly identified as 7-Iron', s10a && s10a.club.name === '7-Iron' && s10a.club.klass === 'iron');
+chk('T10a clubSpeed still reads from the Club Speed column', s10a && s10a.shots[0].clubSpeed === 90.5);
+
+// T10b. No club-like column at all → findClub misses (-1), every row is
+// skipped (clubCode is '' since col.club < 0), and no sessions are produced.
+// This must not throw.
+const genCsvNoClub = `Date,Speed,Distance\n2026-08-15,90.5,145.2\n2026-08-15,91.0,147.0`;
+let p10b, threw10b = false;
+try { p10b = parseGenericLM(genCsvNoClub); } catch (e) { threw10b = true; }
+chk('T10b no club column does not throw', !threw10b);
+chk('T10b col.club is a genuine miss (-1) → no sessions', p10b && p10b.sessions.length === 0);
+chk('T10b both data rows land in skipped', p10b && p10b.skipped.length === 2);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
