@@ -865,16 +865,19 @@ Insert after the `SOURCES` registry, before `/*ENGINE-END*/`:
 // ── Merge: same date + same club = one club-session; shots dedup exactly ─────
 function shotKey(s) {
   // 1 decimal, not 3: matches Trackman's actual display precision (e.g. 31.9,
-  // 116.0, 8.4 in real paste data), and coarser rounding is more robust to
-  // unit-conversion round-trip noise (yards<->meters) without risking
-  // false-positive collisions between genuinely different shots.
+  // 116.0, 8.4 in real paste data). This substantially reduces (but does not
+  // fully eliminate) mismatches from unit-conversion round-trip noise
+  // (yards<->meters) if the SAME physical shots are re-pasted after a display-
+  // unit change — a real but likely rare scenario. The tested, common case
+  // (re-pasting identical text) is unaffected: identical input always produces
+  // identical floats regardless of rounding precision.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
     .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
 }
 function mergeClubSessions(existing, incoming) {
   const key = cs => `${cs.date}|${cs.club.name}`;
   const map = {};
-  existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots] }; });
+  existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } }; });
   let addedShots = 0;
   incoming.forEach(cs => {
     const k = key(cs);
@@ -896,11 +899,15 @@ function mergeClubSessions(existing, incoming) {
 }
 ```
 
-Note: `tags: { ...cs.tags }` on the wholesale-add branch (not just `...cs`) is
-deliberate — a plain `{...cs, shots:[...cs.shots]}` would alias `tags` to the
-same object reference as the caller's incoming session, a shared-mutation
-hazard caught in code review. The merge branch already clones tags safely via
-its own spread.
+Note: `tags: { ...cs.tags }` on BOTH the existing-seeding line and the
+wholesale-add branch (not just `...cs`) is deliberate — a plain
+`{...cs, shots:[...cs.shots]}` would alias `tags` to the same object
+reference as the caller's session, a shared-mutation hazard caught in code
+review across two passes (the first pass fixed only the wholesale-add branch;
+a second review found the identical hazard on the existing-seeding line one
+function up, since any existing session with no same-date+club counterpart in
+a given merge call would otherwise keep its aliased tags). The merge branch
+(inside the `else`) already clones tags safely via its own spread.
 
 - [ ] **Step 4: Run to verify all tests pass**
 
@@ -967,6 +974,81 @@ Commit:
 ```bash
 git add range.html test-range-engine.js
 git commit -m "Code-review fixes for Task 5 merge (shotKey precision, tags aliasing, coverage)"
+```
+
+- [ ] **Step 7: Second-pass fix — the same tags-aliasing hazard, one line up**
+
+Step 6's fix only cloned `tags` on the wholesale-add branch (inside
+`incoming.forEach`). A second review pass found the identical hazard on the
+line that seeds `map` from `existing`, one function up — any existing session
+with no same-date+club counterpart in a given merge call keeps its `tags`
+aliased to the caller's original object.
+
+Change:
+```js
+existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots] }; });
+```
+to:
+```js
+existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } }; });
+```
+
+Also soften the `shotKey` precision comment — the 1-decimal fix substantially
+reduces but does not fully eliminate unit round-trip mismatches (a follow-up
+numeric check found real per-field mismatch rates of 11-23% at 1 decimal on a
+genuine metric↔imperial round-trip, down from ~99% at 3 decimals), and the
+original wording read as implying the problem was fully solved:
+
+```js
+function shotKey(s) {
+  // 1 decimal, not 3: matches Trackman's actual display precision (e.g. 31.9,
+  // 116.0, 8.4 in real paste data). This substantially reduces (but does not
+  // fully eliminate) mismatches from unit-conversion round-trip noise
+  // (yards<->meters) if the SAME physical shots are re-pasted after a display-
+  // unit change — a real but likely rare scenario. The tested, common case
+  // (re-pasting identical text) is unaffected: identical input always produces
+  // identical floats regardless of rounding precision.
+  return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
+    .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
+}
+```
+
+Append tests:
+
+```js
+// T14. Regression: seeding `map` from `existing` must clone tags, not alias
+// them — otherwise mutating a merged session's tags mutates the caller's
+// original input object for any existing session with no matching incoming
+// (the common case: merging one new day's paste against a large persisted
+// history, where most existing sessions aren't touched by `incoming`).
+const clubT14 = canonicalClub('7i');
+const existingT14 = [{ date: '2026-08-15', club: clubT14, tags: { note: 'original' },
+  shots: [{ clubSpeed: 90.5, ballSpeed: 120.3, carry: 145.2, side: -3.1 }] }];
+const m14 = mergeClubSessions(existingT14, []);
+m14.all[0].tags.note = 'mutated';
+chk('T14 existing-only session tags are cloned, not aliased to caller input', existingT14[0].tags.note === 'original');
+
+// T15. Round-trip sanity check: converting a real parsed shot to yd/mph and
+// back through the engine's own conversion functions should still produce
+// the same shotKey at 1-decimal precision. This exercises the code's own
+// round-trip math (multiply then divide by the same constant), not an
+// independent re-paste with independently-rounded source data — it does not
+// prove real cross-unit re-pastes always match, only that the conversion
+// math itself is not lossy beyond 1-decimal rounding.
+const shot15 = s5.shots[0];
+const forward15 = { ...shot15 };
+['carry', 'total', 'side', 'height'].forEach(k => { if (forward15[k] != null) forward15[k] = forward15[k] * M_TO_YD; });
+['clubSpeed', 'ballSpeed'].forEach(k => { if (forward15[k] != null) forward15[k] = forward15[k] * MS_TO_MPH; });
+const roundtrip15 = normalizeShotUnits(forward15, { distance: 'yd', speed: 'mph' });
+chk('T15 round-trip yd/mph -> m/m-s via engine math preserves shotKey at 1 decimal', shotKey(roundtrip15) === shotKey(shot15));
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`.
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Second-pass code-review fixes: tags aliasing on seed branch, softer shotKey comment"
 ```
 
 ---
