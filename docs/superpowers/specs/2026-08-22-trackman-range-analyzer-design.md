@@ -166,8 +166,12 @@ silently deleted. This mirrors the putts/hole quarantine in `index.html`.
 A shot is quarantined when **either**:
 
 - **Bad strike:** smash factor (`ballSpeed / clubSpeed`) is below a club-class
-  floor (irons ~1.25, driver ~1.35 — constants at the top of the engine,
-  tunable like `EXP_PUTT_GIR`).
+  floor (irons 1.15, driver ~1.35 — constants at the top of the engine, tunable
+  like `EXP_PUTT_GIR`). The iron floor is calibrated against the real 7i sample
+  below, not a textbook number: a plausible-sounding 1.25 would incorrectly flag
+  two ordinary shots (smash 1.189 and 1.201) that aren't mishits — the real data
+  clusters 1.19–1.34 except the actual mishit at 1.11. Driver/wood/hybrid floors
+  are unverified estimates pending a real sample from those clubs.
 - **Thin flier:** spin is below `SPIN_FLIER_RATIO` × the reference median spin
   **and** carry is below the reference median carry. `SPIN_FLIER_RATIO`
   defaults to 0.5 and is a tunable engine constant.
