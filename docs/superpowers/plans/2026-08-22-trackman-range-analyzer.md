@@ -694,8 +694,17 @@ function parseGenericLM(text) {
   };
   const H = split(lines[0]).map(h => h.toLowerCase());
   const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  // Plain find('club') would match 'club speed'/'clubhead speed' too (both
+  // contain "club"), silently binding col.club to the wrong column whenever a
+  // speed column is listed before the club-name column — found in code review.
+  // Exact match first, then a substring fallback that excludes speed columns.
+  const findClub = () => {
+    const exact = H.findIndex(h => h === 'club' || h === 'club type' || h === 'club name');
+    if (exact >= 0) return exact;
+    return H.findIndex(h => h.includes('club') && !h.includes('speed'));
+  };
   const col = {
-    date: find('date'), club: find('club'),
+    date: find('date'), club: findClub(),
     clubSpeed: find('club speed', 'clubhead speed'), attackAngle: find('attack'),
     ballSpeed: find('ball speed'), spin: find('spin'), launch: find('launch'),
     carry: find('carry'), total: find('total'), side: find('side', 'offline'),
@@ -745,6 +754,76 @@ Expected: `ALL PASS`.
 ```bash
 git add range.html test-range-engine.js
 git commit -m "Add generic launch-monitor CSV adapter and SOURCES registry"
+```
+
+- [ ] **Step 6: Fix — club-column detection collision (found in code review)**
+
+`find('club')` is a substring match, and `'club speed'`/`'clubhead speed'` both
+contain `"club"` — `find()` returns the FIRST header cell matching, so a header
+listing a speed column before the club-name column (e.g.
+`Date,Club Speed,Club,Ball Speed,Carry`) silently binds `col.club` to the speed
+column, fabricating a numeric "club name". T8's own header happens to list
+`Club` first, so it never caught this. Fix: exact match first, substring
+fallback that excludes speed columns.
+
+Replace:
+```js
+  const H = split(lines[0]).map(h => h.toLowerCase());
+  const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  const col = {
+    date: find('date'), club: find('club'),
+    clubSpeed: find('club speed', 'clubhead speed'), attackAngle: find('attack'),
+```
+with:
+```js
+  const H = split(lines[0]).map(h => h.toLowerCase());
+  const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  // Plain find('club') would match 'club speed'/'clubhead speed' too (both
+  // contain "club"), silently binding col.club to the wrong column whenever a
+  // speed column is listed before the club-name column — found in code review.
+  // Exact match first, then a substring fallback that excludes speed columns.
+  const findClub = () => {
+    const exact = H.findIndex(h => h === 'club' || h === 'club type' || h === 'club name');
+    if (exact >= 0) return exact;
+    return H.findIndex(h => h.includes('club') && !h.includes('speed'));
+  };
+  const col = {
+    date: find('date'), club: findClub(),
+    clubSpeed: find('club speed', 'clubhead speed'), attackAngle: find('attack'),
+```
+
+Append regression tests to `test-range-engine.js`:
+
+```js
+// T10a. Regression: club-speed column appearing BEFORE the club-name column
+// must not hijack col.club via substring match ("club speed".includes("club")).
+const genCsvSpeedFirst = `Date,Club Speed,Club,Ball Speed,Carry\n` +
+  `2026-08-15,90.5,7 Iron,120.3,145.2\n` +
+  `2026-08-15,91.0,7 Iron,121.0,147.0`;
+const p10a = parseGenericLM(genCsvSpeedFirst);
+chk('T10a club column not hijacked by Club Speed column', p10a.sessions.length === 1);
+const s10a = p10a.sessions[0];
+chk('T10a club name is not a numeric string', s10a && !/^\d+(\.\d+)?$/.test(s10a.club.name));
+chk('T10a club correctly identified as 7-Iron', s10a && s10a.club.name === '7-Iron' && s10a.club.klass === 'iron');
+chk('T10a clubSpeed still reads from the Club Speed column', s10a && s10a.shots[0].clubSpeed === 90.5);
+
+// T10b. No club-like column at all → findClub misses (-1), every row is
+// skipped (clubCode is '' since col.club < 0), and no sessions are produced.
+// This must not throw.
+const genCsvNoClub = `Date,Speed,Distance\n2026-08-15,90.5,145.2\n2026-08-15,91.0,147.0`;
+let p10b, threw10b = false;
+try { p10b = parseGenericLM(genCsvNoClub); } catch (e) { threw10b = true; }
+chk('T10b no club column does not throw', !threw10b);
+chk('T10b col.club is a genuine miss (-1) → no sessions', p10b && p10b.sessions.length === 0);
+chk('T10b both data rows land in skipped', p10b && p10b.skipped.length === 2);
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`, including T8 unaffected.
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Fix parseGenericLM club-column detection: substring match on 'club' was matching 'Club Speed' columns"
 ```
 
 ---
