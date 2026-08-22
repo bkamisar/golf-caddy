@@ -515,6 +515,48 @@ function quarantineClub(sessions) {
     return { ...sess, tags: { ...sess.tags }, shots };
   });
 }
+
+// ── Grouping + gapping ────────────────────────────────────────────────────────
+// Groups stored club-sessions by club name, sorts each group's sessions by
+// date, and runs the mishit quarantine once per group. Downstream consumers
+// (gapping table, verdicts) both read from this shared structure rather than
+// re-grouping/re-quarantining independently.
+function groupByClub(clubSessions) {
+  const byClub = {};
+  clubSessions.forEach(cs => { (byClub[cs.club.name] = byClub[cs.club.name] || []).push(cs); });
+  return Object.keys(byClub).map(name => ({
+    name,
+    sessions: quarantineClub(byClub[name].slice().sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0))),
+  }));
+}
+function computeGapping(groups) {
+  const rows = groups.map(g => {
+    const allShots = g.sessions.flatMap(s => s.shots);
+    const clean = allShots.filter(s => !s.quarantined);
+    const carries = clean.map(s => s.carry).filter(v => v != null);
+    const sides = clean.map(s => s.side).filter(v => v != null);
+    const medCarry = median(carries);
+    const club = g.sessions[0].club;
+    return {
+      name: g.name, order: club.order, klass: club.klass,
+      cleanCarryYd: medCarry != null ? medCarry * M_TO_YD : null,
+      mishitRate: allShots.length ? 1 - clean.length / allShots.length : null,
+      sideBiasYd: sides.length ? mean(sides) * M_TO_YD : null,
+      n: clean.length, totalN: allShots.length,
+      lowConfidence: clean.length < 5,
+      sessionCount: g.sessions.length,
+      lastSeen: g.sessions[g.sessions.length - 1].date,
+    };
+  }).sort((a, b) => a.order - b.order);
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (rows[i].cleanCarryYd != null && rows[i + 1].cleanCarryYd != null) {
+      rows[i].gapToNext = rows[i].cleanCarryYd - rows[i + 1].cleanCarryYd;
+      rows[i].gapWarning = rows[i].gapToNext < 8 || rows[i].gapToNext > 20;
+    } else { rows[i].gapToNext = null; rows[i].gapWarning = false; }
+  }
+  if (rows.length) { rows[rows.length - 1].gapToNext = null; rows[rows.length - 1].gapWarning = false; }
+  return rows;
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────

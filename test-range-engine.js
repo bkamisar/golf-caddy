@@ -283,4 +283,44 @@ const q16 = quarantineClub([sixShotsThinData]);
 chk('T16 raw shot count (6) meets MIN_SHOTS_STABLE but only 2 have usable spin/carry', sixShotsThinData.shots.length === 6);
 chk('T16 shot1 (lower spin+carry) NOT quarantined as thin_flier (reference correctly deemed unstable)', q16[0].shots[1].quarantined === false && q16[0].shots[1].quarantineReason !== 'thin_flier');
 
+// T14. computeGapping on the real 7i session (single club, single session)
+const cs14 = mergeClubSessions([], parseTrackman(SAMPLE_7I).sessions).all;
+const groups14 = groupByClub(cs14);
+chk('T14 one group (7-Iron)', groups14.length === 1 && groups14[0].name === '7-Iron');
+const gaps14 = computeGapping(groups14);
+chk('T14 one gapping row', gaps14.length === 1);
+// clean median carry: 10 clean shots (12 minus shots 2 and 10), median in
+// meters converted to yards should land near 126.7 per the spec's worked example
+chk('T14 clean median carry ~126-128 yds', gaps14[0].cleanCarryYd > 126 && gaps14[0].cleanCarryYd < 128);
+chk('T14 mishit rate is 2/12', Math.abs(gaps14[0].mishitRate - 2/12) < 1e-9);
+chk('T14 n = 10 clean shots', gaps14[0].n === 10);
+chk('T14 no next club → gapToNext null', gaps14[0].gapToNext === null);
+
+// T15. Two clubs → gap between them computed and ordered driver-first.
+// Hand-constructed driver session (not a relabeled copy of the 7-iron paste,
+// following the same direct-object-construction pattern Task 6's own tests
+// use) — smash factors here (~1.45) genuinely clear the driver floor (1.35).
+// A relabel-in-place of SAMPLE_7I's iron-speed shots as "Driver" was tried
+// first and failed: those shots' smash factors (1.11-1.34) all sit BELOW the
+// driver floor, so every one gets flagged bad_strike, leaving zero clean
+// shots and a null gapToNext — not a bug in groupByClub/computeGapping, just
+// the wrong fixture for what this test needs to exercise.
+const driverSession15 = { date: '2026-08-22', dateAssumed: false, clubCode: 'Dr', club: canonicalClub('Dr'), tags: {},
+  shots: [
+    { clubSpeed: 47.0, attackAngle: 2.0, ballSpeed: 68.0, spin: 2400, carry: 225.0, side: 5.0 },
+    { clubSpeed: 47.5, attackAngle: 2.5, ballSpeed: 69.0, spin: 2350, carry: 228.0, side: -3.0 },
+    { clubSpeed: 47.2, attackAngle: 1.8, ballSpeed: 68.5, spin: 2450, carry: 226.5, side: 2.0 },
+  ] };
+const cs15 = mergeClubSessions(cs14, [driverSession15]).all;
+const gaps15 = computeGapping(groupByClub(cs15));
+chk('T15 two gapping rows, Driver first', gaps15.length === 2 && gaps15[0].name === 'Driver');
+chk('T15 driver gapToNext is a number', typeof gaps15[0].gapToNext === 'number');
+chk('T15 last row gapToNext is null', gaps15[1].gapToNext === null);
+
+// T16. Low-confidence flag fires under 5 clean shots
+const fewShotsSession = { date: '2026-08-10', dateAssumed: false, clubCode: '9i', club: canonicalClub('9i'), tags: {},
+  shots: [{ clubSpeed: 35, attackAngle: 3, ballSpeed: 45, spin: 7000, carry: 95, side: 2 }] };
+const gaps16 = computeGapping(groupByClub([fewShotsSession]));
+chk('T16 low confidence with 1 clean shot', gaps16[0].lowConfidence === true);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
