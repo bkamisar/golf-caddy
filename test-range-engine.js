@@ -157,4 +157,18 @@ chk('T10b no club column does not throw', !threw10b);
 chk('T10b col.club is a genuine miss (-1) → no sessions', p10b && p10b.sessions.length === 0);
 chk('T10b both data rows land in skipped', p10b && p10b.skipped.length === 2);
 
+// T10. Merge: new club-session added, shots dedup within same date+club
+const existing10 = parseTrackman(SAMPLE_7I).sessions;
+const m10a = mergeClubSessions([], existing10);
+chk('T10 first merge adds all 12 shots', m10a.addedShots === 12 && m10a.all.length === 1);
+const m10b = mergeClubSessions(m10a.all, parseTrackman(SAMPLE_7I).sessions);
+chk('T10 re-pasting the same session adds 0 shots (idempotent)', m10b.addedShots === 0);
+chk('T10 still one club-session, still 12 shots', m10b.all.length === 1 && m10b.all[0].shots.length === 12);
+
+// T11. Different club same date → separate club-session
+const driverSample = SAMPLE_7I.replace('7i\n7IronHide', 'Dr\nDriverHide');
+const m11 = mergeClubSessions(m10b.all, parseTrackman(driverSample).sessions);
+chk('T11 driver session added separately', m11.all.length === 2);
+chk('T11 sorted driver before 7-iron', m11.all[0].club.name === 'Driver' && m11.all[1].club.name === '7-Iron');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

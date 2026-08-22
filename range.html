@@ -418,6 +418,35 @@ var SOURCES = {
   trackman: { label: 'Trackman (range table)', parse: parseTrackman },
   generic:  { label: 'Other launch monitor (CSV/table)', parse: parseGenericLM },
 };
+
+// ── Merge: same date + same club = one club-session; shots dedup exactly ─────
+function shotKey(s) {
+  return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
+    .map(k => s[k] == null ? '' : s[k].toFixed(3)).join('|');
+}
+function mergeClubSessions(existing, incoming) {
+  const key = cs => `${cs.date}|${cs.club.name}`;
+  const map = {};
+  existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots] }; });
+  let addedShots = 0;
+  incoming.forEach(cs => {
+    const k = key(cs);
+    if (!map[k]) {
+      map[k] = { ...cs, shots: [...cs.shots] };
+      addedShots += cs.shots.length;
+    } else {
+      const seen = new Set(map[k].shots.map(shotKey));
+      cs.shots.forEach(s => {
+        const sk = shotKey(s);
+        if (!seen.has(sk)) { map[k].shots.push(s); seen.add(sk); addedShots++; }
+      });
+      map[k].tags = { ...cs.tags, ...map[k].tags };
+    }
+  });
+  const all = Object.values(map).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : a.club.order - b.club.order);
+  return { all, addedShots };
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
