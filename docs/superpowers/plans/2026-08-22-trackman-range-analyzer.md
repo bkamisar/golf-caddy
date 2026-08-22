@@ -1417,6 +1417,11 @@ Insert after `computeGapping`, before `/*ENGINE-END*/`:
 // where the club wasn't hit are absent from the array entirely, so a club hit
 // on 5 visits gets a full window even with other clubs' visits interleaved.
 function computeTrend(sessions) {
+  // Defensive sort: don't trust caller order. groupByClub sorts before calling
+  // us today, but index.html shipped this exact bug once (commit 9ba2fc4) —
+  // an unsorted array here would silently swap "recent" vs "baseline" and
+  // produce an inverted-but-plausible-looking trend verdict.
+  sessions = [...sessions].sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
   const n = sessions.length;
   if (n < 3) return { enough: false, reason: 'not enough sessions' };
   const recent = sessions.slice(-2);
@@ -1468,6 +1473,52 @@ Expected: `ALL PASS`.
 ```bash
 git add range.html test-range-engine.js
 git commit -m "Add computeTrend: 2-vs-3 session window with ball/weather confounder split"
+```
+
+- [ ] **Step 6: Fix from code review — defensive sort**
+
+Code review found `computeTrend` trusts caller order with no internal
+validation — a real risk given `index.html`'s own history (commit `9ba2fc4`,
+"engine sorts internally (order bug reversed trend verdicts)"). Cheap,
+zero-behavior-change fix for the current caller (`groupByClub` already sorts):
+
+```js
+function computeTrend(sessions) {
+  // Defensive sort: don't trust caller order. groupByClub sorts before calling
+  // us today, but index.html shipped this exact bug once (commit 9ba2fc4) —
+  // an unsorted array here would silently swap "recent" vs "baseline" and
+  // produce an inverted-but-plausible-looking trend verdict.
+  sessions = [...sessions].sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+  const n = sessions.length;
+  if (n < 3) return { enough: false, reason: 'not enough sessions' };
+  const recent = sessions.slice(-2);
+  const baseline = sessions.slice(-5, -2);
+  if (recent.length < 1 || baseline.length < 2) return { enough: false, reason: 'not enough sessions' };
+```
+
+Append a regression test proving the fix actually works (verified by the
+implementer to fail if the sort is removed):
+
+```js
+// T21. computeTrend must not trust caller order: feed it the SAME 5-session
+// history as T17 (post-quarantine, via groups17[0].sessions) but reversed.
+// computeTrend's own defensive sort should recover the correct recent/baseline
+// split, producing byte-for-byte identical results to T17's correctly-ordered call.
+const shuffled17 = [...groups17[0].sessions].reverse();
+const t21 = computeTrend(shuffled17);
+chk('T21 reversed input still enough data', t21.enough === t17.enough);
+chk('T21 reversed input: same recent carry as T17', t21.carry.recent === t17.carry.recent);
+chk('T21 reversed input: same baseline carry as T17', t21.carry.baseline === t17.carry.baseline);
+chk('T21 reversed input: same caveat as T17', t21.caveat === t17.caveat);
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`, T17-T20 byte-for-byte
+unchanged (proving the sort is a true no-op for already-sorted input).
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Code-review fix (Task 8): computeTrend sorts defensively, no longer trusts caller order"
 ```
 
 ---
