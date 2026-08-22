@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Golf Caddy — Range Analyzer</title>
+<style>
+  :root { --bg:#0f1512; --card:#1a231e; --ink:#e8f0ea; --dim:#9ab3a3; --line:#2c3a32;
+          --good:#5dd39e; --bad:#e07a5f; --accent:#8ecae6; --warn:#f2cc8f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; padding:14px; }
+  h1 { font-size:20px; margin:6px 0 2px; } h1 span{color:var(--good);}
+  .sub { color:var(--dim); font-size:12.5px; margin-bottom:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em;
+             color:var(--dim); margin:0 0 8px; }
+  textarea { width:100%; min-height:110px; background:#101815; color:var(--ink);
+             border:1px solid var(--line); border-radius:8px; padding:8px; font-size:12px; }
+  select, input[type=text], input[type=number] {
+    background:#101815; color:var(--ink); border:1px solid var(--line); border-radius:8px;
+    padding:7px; font-size:13px;
+  }
+  button { background:var(--good); color:#0c130f; border:0; border-radius:8px;
+           padding:9px 14px; font-weight:700; font-size:14px; cursor:pointer; margin:6px 6px 0 0; }
+  button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line); }
+  .verdict { font-size:15px; margin:8px 0; padding:10px 12px; border-left:4px solid var(--accent);
+             background:#131c17; border-radius:0 8px 8px 0; }
+  .verdict.good { border-color:var(--good); } .verdict.bad { border-color:var(--bad); }
+  .verdict.warn { border-color:var(--warn); }
+  .verdict b { color:var(--accent); } .verdict.good b{color:var(--good);} .verdict.bad b{color:var(--bad);}
+  .verdict.warn b{color:var(--warn);}
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { padding:5px 7px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child,td:first-child { text-align:left; }
+  th { color:var(--dim); font-weight:600; }
+  .up{color:var(--good);} .down{color:var(--bad);} .flat{color:var(--dim);}
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
+  .tagrow { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+  .foot { color:var(--dim); font-size:11px; margin:14px 0 30px; }
+  #msg { color:var(--warn); font-size:12.5px; min-height:16px; }
+  details summary { cursor:pointer; color:var(--dim); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⛳ Golf Caddy — <span>Range</span></h1>
+  <div class="sub">Paste your Trackman range session → real clean-shot yardages, gapping, and a trend that survives mishits. All local, no account. <a href="index.html" style="color:var(--accent)">Round analyzer →</a></div>
+
+  <div class="card">
+    <h2>Add a session</h2>
+    <select id="source" style="width:100%;margin-bottom:8px">
+      <option value="trackman">Trackman — paste one club's session table</option>
+      <option value="generic">Other launch monitor — CSV / table</option>
+    </select>
+    <div class="tagrow">
+      <select id="tagBall"><option value="">Ball: unknown</option><option value="range">Range ball</option><option value="premium">Premium ball</option></select>
+      <select id="tagVenue"><option value="">Venue: unknown</option><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select>
+      <input type="number" id="tagTemp" placeholder="Temp °F (optional)" style="width:150px">
+      <input type="text" id="tagFacility" placeholder="Facility (optional)" style="width:160px">
+    </div>
+    <select id="clubOverride" style="width:100%;margin-bottom:8px"><option value="">Club: auto-detect from paste</option></select>
+    <textarea id="paste" placeholder="Trackman: select the whole per-club shot table (header through the Consistency row) → copy → paste. Re-pasting is safe — duplicate shots merge."></textarea>
+    <button onclick="doParse()">Parse &amp; save</button>
+    <button class="ghost" onclick="doExport()">Export JSON</button>
+    <button class="ghost" onclick="document.getElementById('imp').click()">Import</button>
+    <button class="ghost" onclick="doClear()">Clear all</button>
+    <input type="file" id="imp" style="display:none" onchange="doImport(event)">
+    <div id="msg"></div>
+  </div>
+
+  <div id="dash"></div>
+  <div class="foot">Gapping uses the clean-shot median after mishit quarantine, not Trackman's on-screen average, which includes duffs. Trend compares your most recent 2 sessions per club against the previous 3. Nothing leaves your browser.</div>
+</div>
+
+<script>
+/*ENGINE-START*/
+// ── Unit conversion ──────────────────────────────────────────────────────────
+// NOTE: declared with `var` (not `const`) deliberately — the test harness uses
+// a direct eval to extract this block, and per JS spec only `var`/`function`
+// declarations leak into the caller's scope from a direct eval; `const`/`let`
+// stay trapped in the eval's own lexical environment. Matters here because,
+// unlike index.html's helpers, these are referenced directly by name in tests.
+var M_TO_YD = 1.09361;
+var MS_TO_MPH = 2.23694;
+
+// ── Shared numeric helpers (same as index.html's engine) ─────────────────────
+function quantile(sorted, q) {
+  if (!sorted.length) return null;
+  const pos = (sorted.length - 1) * q, lo = Math.floor(pos);
+  return lo + 1 < sorted.length ? sorted[lo] + (sorted[lo + 1] - sorted[lo]) * (pos - lo) : sorted[lo];
+}
+var median = a => quantile([...a].sort((x, y) => x - y), 0.5);
+var mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+var r1 = v => v === null || v === undefined || isNaN(v) ? null : Math.round(v * 10) / 10;
+
+// ── Club table: canonical name, bag order (driver→wedges), club class for
+// smash-factor floors. Regexes match Trackman's short codes case-insensitively.
+const CLUB_TABLE = [
+  { re:/^(dr|driver|1w)$/i, name:'Driver',   order:0,  klass:'driver' },
+  { re:/^(2w)$/i,           name:'2-Wood',   order:1,  klass:'wood' },
+  { re:/^(3w)$/i,           name:'3-Wood',   order:2,  klass:'wood' },
+  { re:/^(4w)$/i,           name:'4-Wood',   order:3,  klass:'wood' },
+  { re:/^(5w)$/i,           name:'5-Wood',   order:4,  klass:'wood' },
+  { re:/^(7w)$/i,           name:'7-Wood',   order:5,  klass:'wood' },
+  { re:/^(2h|h2)$/i,        name:'2-Hybrid', order:6,  klass:'hybrid' },
+  { re:/^(3h|h3)$/i,        name:'3-Hybrid', order:7,  klass:'hybrid' },
+  { re:/^(4h|h4)$/i,        name:'4-Hybrid', order:8,  klass:'hybrid' },
+  { re:/^(5h|h5)$/i,        name:'5-Hybrid', order:9,  klass:'hybrid' },
+  { re:/^(2i)$/i,           name:'2-Iron',   order:10, klass:'iron' },
+  { re:/^(3i)$/i,           name:'3-Iron',   order:11, klass:'iron' },
+  { re:/^(4i)$/i,           name:'4-Iron',   order:12, klass:'iron' },
+  { re:/^(5i)$/i,           name:'5-Iron',   order:13, klass:'iron' },
+  { re:/^(6i)$/i,           name:'6-Iron',   order:14, klass:'iron' },
+  { re:/^(7i)$/i,           name:'7-Iron',   order:15, klass:'iron' },
+  { re:/^(8i)$/i,           name:'8-Iron',   order:16, klass:'iron' },
+  { re:/^(9i)$/i,           name:'9-Iron',   order:17, klass:'iron' },
+  { re:/^(pw)$/i,           name:'PW',       order:18, klass:'wedge' },
+  { re:/^(gw|aw)$/i,        name:'GW',       order:19, klass:'wedge' },
+  { re:/^(sw)$/i,           name:'SW',       order:20, klass:'wedge' },
+  { re:/^(lw)$/i,           name:'LW',       order:21, klass:'wedge' },
+];
+function canonicalClub(code) {
+  const c = (code || '').trim();
+  for (const row of CLUB_TABLE) if (row.re.test(c)) return { code: c, name: row.name, order: row.order, klass: row.klass };
+  return { code: c, name: c || 'Unknown', order: 999, klass: 'unknown' };
+}
+function clubByName(name) {
+  const row = CLUB_TABLE.find(c => c.name === name);
+  return row ? { code: name, name: row.name, order: row.order, klass: row.klass } : null;
+}
+
+// Escape any string that came from a paste before it touches innerHTML.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+/*ENGINE-END*/
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
