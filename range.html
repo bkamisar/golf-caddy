@@ -116,7 +116,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="sec">
     <h2>Add a session</h2>
     <select id="source" style="width:100%;margin-bottom:8px">
       <option value="trackman">Trackman — paste one club's session table</option>
@@ -883,7 +883,7 @@ function render() {
   const clubSessions = load();
   const dash = document.getElementById('dash');
   if (!clubSessions.length) {
-    dash.innerHTML = '<div class="card"><h2>No sessions yet</h2>Paste your Trackman club table above.</div>';
+    dash.innerHTML = '<div class="sec"><h2>No sessions yet</h2><div class="note"><span class="dot"></span><span class="txt">Paste your Trackman club table above to get started.</span></div></div>';
     return;
   }
   const groups = groupByClub(clubSessions);
@@ -895,51 +895,65 @@ function render() {
   const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
     <td>${esc(row.clubName)}</td>
     <td>${esc(row.date)}</td>
-    <td>${row.clean}/${row.total}</td>
-    <td>${row.mishitRate != null ? row.mishitRate + '%' : '–'}</td>
+    <td class="num">${row.clean}/${row.total}</td>
+    <td class="num">${row.mishitRate != null ? row.mishitRate + '%' : '–'}</td>
     <td><button class="ghost danger small" onclick="doDeleteSession(${i})">Delete</button></td>
   </tr>`).join('');
 
-  const gapRows = gaps.map(g => `<tr>
-    <td>${esc(g.name)}${g.lowConfidence ? ' ⚠' : ''}</td>
-    <td>${g.cleanCarryYd != null ? Math.round(g.cleanCarryYd) : '–'}</td>
-    <td>${g.gapToNext != null ? (g.gapWarning ? `<span class="down">${Math.round(g.gapToNext)}</span>` : Math.round(g.gapToNext)) : '–'}</td>
-    <td>${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : '–'}</td>
-    <td>${g.sideBiasYd != null ? `${Math.round(Math.abs(g.sideBiasYd))}${g.sideBiasYd >= 0 ? 'R' : 'L'}` : '–'}</td>
-    <td>${g.n}/${g.totalN}</td>
-    <td>${esc(g.lastSeen)}</td>
-  </tr>`).join('');
+  // Ladder: bar width is each club's carry relative to the longest club in the bag.
+  const carries = gaps.map(g => g.cleanCarryYd).filter(v => v != null);
+  const maxCarry = carries.length ? Math.max(...carries) : 0;
+  const ladderHtml = gaps.map(g => {
+    const pct = (g.cleanCarryYd != null && maxCarry) ? (g.cleanCarryYd / maxCarry * 100) : 0;
+    const bits = [];
+    if (g.sideBiasYd != null) bits.push(Math.abs(g.sideBiasYd) < 1 ? 'straight' : `${Math.round(Math.abs(g.sideBiasYd))} yds ${g.sideBiasYd >= 0 ? 'right' : 'left'}`);
+    if (g.mishitRate != null) bits.push(`${Math.round(g.mishitRate * 100)}% mishit`);
+    if (g.gapToNext != null) bits.push(`${Math.round(Math.abs(g.gapToNext))} yd gap`);
+    return `<div class="ladder">
+      <span class="nm">${esc(g.name)}${g.lowConfidence ? ' <span class="flat">⚠</span>' : ''}</span>
+      <span class="track"><span class="fill${g.gapWarning ? '' : ' good'}" style="width:${pct.toFixed(1)}%"></span></span>
+      <span class="val">${g.cleanCarryYd != null ? Math.round(g.cleanCarryYd) : '–'}<small> yd</small></span>
+    </div>
+    <div style="font-size:11px;color:var(--label);padding:0 0 8px 76px;margin-top:-6px">${esc(bits.join(' · '))}</div>`;
+  }).join('');
+
+  const notesHtml = verdicts.map(v => `<div class="note ${v.tone}"><span class="dot"></span><span class="txt">${v.text}</span></div>`).join('');
 
   const detailCards = groups.map(g => {
     const allShots = g.sessions.flatMap(s => s.shots);
-    const rows = allShots.map(s => `<tr${s.quarantined ? ' style="opacity:.5"' : ''}>
-      <td>${r1(s.clubSpeed) ?? '–'}</td><td>${r1(s.ballSpeed) ?? '–'}</td>
-      <td>${r1(s.spin) ?? '–'}</td><td>${r1(s.carry) != null ? r1(s.carry * M_TO_YD) : '–'}</td>
-      <td>${r1(s.side) != null ? r1(Math.abs(s.side) * M_TO_YD) + (s.side >= 0 ? 'R' : 'L') : '–'}</td>
+    const rows = allShots.map(s => `<tr${s.quarantined ? ' style="opacity:.45"' : ''}>
+      <td class="num">${r1(s.clubSpeed) ?? '–'}</td><td class="num">${r1(s.ballSpeed) ?? '–'}</td>
+      <td class="num">${r1(s.spin) ?? '–'}</td><td class="num">${r1(s.carry) != null ? r1(s.carry * M_TO_YD) : '–'}</td>
+      <td class="num">${r1(s.side) != null ? r1(Math.abs(s.side) * M_TO_YD) + (s.side >= 0 ? 'R' : 'L') : '–'}</td>
       <td>${s.quarantined ? `⚠ ${s.quarantineReason === 'bad_strike' ? 'bad strike' : 'thin flier'}` : ''}</td>
     </tr>`).join('');
     return `<details><summary>${esc(g.name)} — ${allShots.length} shots across ${g.sessions.length} session(s)</summary>
-      <table style="margin-top:6px"><tr><th>Club spd (m/s)</th><th>Ball spd (m/s)</th><th>Spin</th><th>Carry (yd)</th><th>Side</th><th>Flag</th></tr>${rows}</table>
+      <table style="margin-top:6px"><tr><th>Club spd</th><th>Ball spd</th><th>Spin</th><th>Carry (yd)</th><th>Side</th><th>Flag</th></tr>${rows}</table>
     </details>`;
   }).join('');
 
   dash.innerHTML = `
-  <div class="card"><h2>Verdicts</h2>
-    ${verdicts.map(v => `<div class="verdict ${v.tone}">${v.text}</div>`).join('')}
+  <div class="sec">
+    <div class="split">
+      <div>
+        <h2>The bag — driver → wedges, clean-shot median</h2>
+        ${ladderHtml}
+      </div>
+      <div class="rail">
+        <h2>Notes</h2>
+        ${notesHtml}
+      </div>
+    </div>
   </div>
-  <div class="card"><h2>Club gapping (clean-shot median, driver → wedges)</h2>
-    <table><tr><th>Club</th><th>Carry (yd)</th><th>Gap</th><th>Mishit</th><th>Side</th><th>Clean/Total</th><th>Last seen</th></tr>
-    ${gapRows}</table>
-  </div>
-  <div class="card"><h2>Saved sessions</h2>
+  <div class="sec"><h2>Saved sessions</h2>
     <table><tr><th>Club</th><th>Date</th><th>Clean/Total</th><th>Mishit</th><th></th></tr>
     ${savedRowsHtml}</table>
   </div>
-  <div class="card"><h2>Coach debrief — copy into Claude</h2>
+  <div class="sec"><h2>Coach debrief — copy into Claude</h2>
     <textarea id="coach" readonly>${esc(prompt)}</textarea>
     <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
   </div>
-  <div class="card"><h2>Per-club detail</h2>${detailCards}</div>`;
+  <div class="sec"><h2>Per-club detail</h2>${detailCards}</div>`;
 }
 
 function msg(t) { document.getElementById('msg').textContent = t; }
