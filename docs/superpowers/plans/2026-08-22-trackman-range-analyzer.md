@@ -2303,12 +2303,18 @@ chk('T29 low confidence with zero clean shots', gaps29[0].lowConfidence === true
 const v29 = computeVerdicts(groups29, gaps29, []);
 chk('T29 verdicts computed without throwing', Array.isArray(v29));
 
-// T30. Out-of-order session input never reverses the trend — groupByClub must
-// sort internally regardless of array order passed in
+// T30. Out-of-order session input never reverses the trend. Two things are
+// checked separately: groupByClub's OWN sort (asserted directly on its output
+// dates, isolating that specific mechanism — computeTrend has its own
+// independent defensive sort too, so routing through computeTrend alone would
+// still pass even if groupByClub's sort were deleted, giving false confidence)
+// and the end-to-end trend result staying correct either way.
 const shuffled = [hist17[3], hist17[0], hist17[4], hist17[1], hist17[2]]; // scrambled order
-const t30 = computeTrend(groupByClub(shuffled)[0].sessions);
+const shuffledGroup = groupByClub(shuffled)[0];
+chk('T30 groupByClub itself sorts sessions ascending by date', shuffledGroup.sessions.map(s => s.date).join(',') === hist17.map(s => s.date).join(','));
+const t30 = computeTrend(shuffledGroup.sessions);
 const t30sorted = computeTrend(groupByClub(hist17)[0].sessions);
-chk('T30 shuffled input yields identical trend to sorted input', t30.carry.recent === t30sorted.carry.recent && t30.carry.baseline === t30sorted.carry.baseline);
+chk('T30 shuffled input yields identical end-to-end trend to sorted input', t30.carry.recent === t30sorted.carry.recent && t30.carry.baseline === t30sorted.carry.baseline);
 
 // T31. Unrecognized club code degrades gracefully instead of failing the parse
 const weirdClub = SAMPLE_7I.replace('7i\n7IronHide', 'XYZ9\nMysteryClub');
