@@ -638,7 +638,10 @@ function computeVerdicts(groups, gaps, checks) {
   });
   gaps.forEach((g, i) => {
     if (!g.gapWarning || g.gapToNext == null) return;
-    if (g.gapToNext < 0) {
+    // -3 yds, not any negative value: below that a "crossed" gap is
+    // rounding/measurement noise (matches the carry-trend verdict's own
+    // 3-yd significance floor above), not a real fitting-implicating flip.
+    if (g.gapToNext < -3) {
       v.push({ tone: 'bad', text: `<b>Crossed clubs:</b> ${esc(g.name)} carries ${r1(Math.abs(g.gapToNext))} yds LESS than ${esc(gaps[i + 1].name)} — check club fitting or whether mishits are dragging this club's number down.` });
       return;
     }

@@ -445,4 +445,26 @@ chk('T26 displayed yardage is positive', v26.some(v => v.text.includes('Crossed 
   return m && parseFloat(m[1]) > 0;
 })()));
 
+// T27. Second code-review fix regression: a near-zero negative gapToNext
+// (rounding/measurement noise, well under the 3-yd significance floor used
+// elsewhere in this function) must NOT trip the alarming "Crossed clubs"
+// wording — it should read as an ordinary "Gap tight" verdict instead, same
+// as a near-zero positive gap would. gapToNext still trips gapWarning here
+// (it's < 8), so the tight/wide branch is reachable; only the sign is inverted.
+const nearZeroCrossedGapSessions = [
+  { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:32,attackAngle:2,ballSpeed:42,spin:5500,carry:100,side:0})) },
+  { date: '2026-08-01', dateAssumed: false, clubCode: '8i', club: canonicalClub('8i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:31,attackAngle:2,ballSpeed:41,spin:5800,carry:100.65,side:0})) },
+];
+const groups27 = groupByClub(nearZeroCrossedGapSessions);
+const gaps27 = computeGapping(groups27);
+chk('T27 sanity: gapToNext is negative but small', gaps27[0].gapToNext < 0 && gaps27[0].gapToNext > -3);
+chk('T27 sanity: gap warning still fires (noise gap is still < 8yd)', gaps27[0].gapWarning === true);
+const v27 = computeVerdicts(groups27, gaps27, []);
+chk('T27 no "Crossed clubs" verdict for noise-level negative gap', !v27.some(v => v.text.includes('Crossed clubs')));
+chk('T27 ordinary "Gap tight" verdict fires instead', v27.some(v => v.text.includes('Gap tight')));
+// T26 unaffected by the new floor: -16 yd is still well past -3, still "Crossed clubs".
+chk('T27 does not affect T26 (strongly-crossed bag)', v26.some(v => v.text.includes('Crossed clubs')));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
