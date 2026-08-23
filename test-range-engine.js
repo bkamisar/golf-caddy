@@ -489,4 +489,76 @@ try { key28 = shotKey(garbageShot); } catch (e) { threw28 = true; }
 chk('T28 shotKey does not throw on non-numeric/NaN fields', !threw28);
 chk('T28 shotKey still returns a string', typeof key28 === 'string');
 
+// T26. Yards/mph unit paste normalizes correctly (values converted to metric
+// internally, then re-converted to yards for display — round-trip check)
+const yardsSample = `2026-08-20
+7i
+7IronHide
+Club Speed\tAttack Ang.\tBall Speed\tSpin Rate\tCarry\tSide
+mph\tDeg\tmph\tRpm\tyds\tyds
+71.4\t3.0\t94.6\t5390\t126.9\t9.2L
+72.9\t2.0\t81.2\t5400\t118.5\t3.0R
+73.2\t3.5\t95.5\t5450\t128.5\t2.0R
+73.0\t3.0\t96.0\t5500\t129.0\t1.0L
+72.5\t2.8\t95.0\t5480\t127.5\t0.5R
+73.4\t3.2\t96.5\t5520\t130.0\t2.5L
+Average\t72.7\t2.9\t93.1\t5457\t126.7\t0.6R
+Consistency\t0.7\t0.5\t5.4\t50\t3.6\t3.2`;
+const p26 = parseTrackman(yardsSample);
+chk('T26 one session parsed from yards paste', p26.sessions.length === 1);
+// carry stored internally in meters: 126.9 yds / 1.09361 ≈ 116.02 m
+chk('T26 carry normalized to metric internally', Math.abs(p26.sessions[0].shots[0].carry - 126.9 / M_TO_YD) < 0.01);
+chk('T26 club speed normalized to m/s', Math.abs(p26.sessions[0].shots[0].clubSpeed - 71.4 / MS_TO_MPH) < 0.01);
+
+// T27. Driver paste with a different, larger column set (Total/Launch/Height/Curve)
+const driverCols = `2026-08-20
+Dr
+BigStick
+Club Speed\tAttack Ang.\tBall Speed\tLaunch Ang.\tSpin Rate\tCarry\tTotal\tHeight\tCurve\tSide
+m/s\tDeg\tm/s\tDeg\tRpm\tm\tm\tm\tm\tm
+47.0\t2.0\t68.0\t12.0\t2400\t225.0\t240.0\t28.0\t3.0\t5.0R
+47.5\t2.5\t69.0\t11.5\t2350\t228.0\t243.0\t27.5\t2.5\t3.0L
+47.2\t1.8\t68.5\t12.2\t2450\t226.5\t241.5\t28.2\t4.0\t2.0R
+47.8\t2.2\t69.5\t11.8\t2380\t229.0\t244.0\t27.8\t1.5\t1.0R
+47.1\t2.0\t68.2\t12.1\t2420\t225.5\t240.5\t28.1\t3.5\t4.0L
+Average\t47.3\t2.1\t68.6\t11.9\t2400\t226.8\t241.8\t27.9\t2.9\t0.6R
+Consistency\t0.3\t0.3\t0.5\t0.3\t35\t1.5\t1.5\t0.3\t1.0\t2.7`;
+const p27 = parseTrackman(driverCols);
+chk('T27 driver session parsed with extra columns', p27.sessions.length === 1 && p27.sessions[0].club.name === 'Driver');
+chk('T27 launch/total/height/curve all captured', ['launch','total','height','curve'].every(k => p27.sessions[0].shots[0][k] != null));
+chk('T27 self-check passes on well-formed data', p27.checks[0].ok === true);
+
+// T28. Missing date line → dateAssumed true, defaults to today, still parses shots
+const noDate = SAMPLE_7I.split('\n').slice(1).join('\n'); // drop "2026-08-22"
+const p28 = parseTrackman(noDate);
+chk('T28 still parses 12 shots without a date line', p28.sessions.length === 1 && p28.sessions[0].shots.length === 12);
+chk('T28 dateAssumed is true', p28.sessions[0].dateAssumed === true);
+chk('T28 date defaults to a valid ISO date', /^\d{4}-\d{2}-\d{2}$/.test(p28.sessions[0].date));
+
+// T29. All-mishit session: quarantine flags every shot, gapping degrades to
+// low-confidence rather than crashing or reporting a fake median
+const allBad = { date: '2026-08-05', dateAssumed: false, clubCode: 'lw', club: canonicalClub('lw'), tags: {},
+  shots: Array.from({ length: 6 }, () => ({ clubSpeed: 25, attackAngle: -5, ballSpeed: 15, spin: 8000, carry: 10, side: 0 })) };
+// smash = 15/25 = 0.6, well under the wedge floor of 1.15 → all quarantined as bad_strike
+const groups29 = groupByClub([allBad]);
+chk('T29 every shot quarantined', groups29[0].sessions[0].shots.every(s => s.quarantined === true));
+const gaps29 = computeGapping(groups29);
+chk('T29 gapping n=0, no crash', gaps29[0].n === 0 && gaps29[0].cleanCarryYd === null);
+chk('T29 low confidence with zero clean shots', gaps29[0].lowConfidence === true);
+const v29 = computeVerdicts(groups29, gaps29, []);
+chk('T29 verdicts computed without throwing', Array.isArray(v29));
+
+// T30. Out-of-order session input never reverses the trend — groupByClub must
+// sort internally regardless of array order passed in
+const shuffled = [hist17[3], hist17[0], hist17[4], hist17[1], hist17[2]]; // scrambled order
+const t30 = computeTrend(groupByClub(shuffled)[0].sessions);
+const t30sorted = computeTrend(groupByClub(hist17)[0].sessions);
+chk('T30 shuffled input yields identical trend to sorted input', t30.carry.recent === t30sorted.carry.recent && t30.carry.baseline === t30sorted.carry.baseline);
+
+// T31. Unrecognized club code degrades gracefully instead of failing the parse
+const weirdClub = SAMPLE_7I.replace('7i\n7IronHide', 'XYZ9\nMysteryClub');
+const p31 = parseTrackman(weirdClub);
+chk('T31 unrecognized code still parses shots', p31.sessions.length === 1 && p31.sessions[0].shots.length === 12);
+chk('T31 club falls back to Unknown-class with raw code as name', p31.sessions[0].club.klass === 'unknown' && p31.sessions[0].club.name === 'XYZ9');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
