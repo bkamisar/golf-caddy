@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Golf Caddy — Course View</title>
+<style>
+  :root {
+    --bg:#0e2818; --surface:#0d1f14; --ink:#f2ecd8; --dim:#a8b8a0; --label:#7d9276;
+    --gold:#c9a961; --good:#6ea36f; --bad:#b5654a; --line:rgba(201,169,97,.16);
+    --line-strong:rgba(201,169,97,.28);
+    --serif:Georgia,'Times New Roman',serif;
+    --sans:-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 var(--sans); }
+  .wrap { max-width:900px; margin:0 auto; padding:22px 20px 40px; }
+
+  /* Header */
+  .masthead { display:flex; justify-content:space-between; align-items:flex-end;
+              padding-bottom:16px; border-bottom:1px solid var(--line-strong); margin-bottom:22px; }
+  h1 { font:400 italic 24px/1.1 var(--serif); margin:0; letter-spacing:.01em; }
+  h1 span { color:var(--gold); font-style:normal; }
+  .sub { color:var(--label); font-size:10.5px; text-transform:uppercase;
+         letter-spacing:.09em; margin-top:5px; }
+  .sub a { color:var(--gold); text-decoration:none; }
+  .sub a:hover { text-decoration:underline; }
+
+  /* Sections replace cards: hairline rules, no boxes/shadows */
+  .sec { padding:20px 0; border-bottom:1px solid var(--line); }
+  .sec:last-child { border-bottom:0; }
+  .sec > h2 { font:600 10.5px/1 var(--sans); text-transform:uppercase; letter-spacing:.1em;
+              color:var(--label); margin:0 0 14px; }
+
+  /* Annotated notes (verdicts) */
+  .note { display:flex; gap:9px; align-items:baseline; padding:7px 0; }
+  .note .dot { width:6px; height:6px; border-radius:50%; flex:0 0 6px;
+               position:relative; top:5px; background:var(--label); }
+  .note.good .dot { background:var(--good); }
+  .note.warn .dot { background:var(--gold); }
+  .note.bad  .dot { background:var(--bad); }
+  .note .txt { font-size:13.5px; color:var(--dim); line-height:1.5; }
+  .note .txt b { color:var(--ink); font-weight:600; }
+
+  /* Ladder rows */
+  .ladder { display:flex; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .ladder:last-child { border-bottom:0; }
+  .ladder .nm { width:76px; flex:0 0 76px; font-size:13px; font-weight:600; color:var(--ink); }
+  .ladder .track { flex:1; height:5px; border-radius:3px; margin:0 12px;
+                   background:rgba(201,169,97,.12); position:relative; }
+  .ladder .fill { position:absolute; left:0; top:0; height:5px; border-radius:3px; background:var(--gold); }
+  .ladder .fill.good { background:var(--good); }
+  .ladder .val { width:66px; flex:0 0 66px; text-align:right; font:600 17px/1 var(--mono);
+                 font-variant-numeric:tabular-nums; color:var(--ink); }
+  .ladder .val small { font:400 10.5px var(--sans); color:var(--label); }
+
+  /* Two-column: main + notes rail, stacks under 720px */
+  .split { display:grid; grid-template-columns:1fr 230px; gap:0 26px; }
+  .split > .rail { border-left:1px solid var(--line); padding-left:22px; }
+  @media (max-width:720px) {
+    .split { grid-template-columns:1fr; }
+    .split > .rail { border-left:0; padding-left:0; border-top:1px solid var(--line);
+                     padding-top:16px; margin-top:8px; }
+  }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th,td { padding:8px 8px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child,td:first-child { text-align:left; }
+  th { color:var(--label); font-weight:600; font-size:10px; text-transform:uppercase;
+       letter-spacing:.07em; }
+  td { color:var(--dim); }
+  td.num, .num { font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--ink); }
+  .up{color:var(--good);} .down{color:var(--bad);} .flat{color:var(--label);}
+
+  /* Stat tiles (index.html trends) */
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px;
+          background:var(--line); border:1px solid var(--line); }
+  .stat { background:var(--bg); padding:13px 14px; }
+  .stat .n { font:600 23px/1 var(--mono); font-variant-numeric:tabular-nums; color:var(--ink); }
+  .stat .l { color:var(--label); font-size:10.5px; margin-top:5px; line-height:1.4; }
+  .stat svg { display:block; width:100%; height:40px; margin-top:8px; }
+
+  /* Forms */
+  textarea { width:100%; min-height:104px; background:var(--surface); color:var(--ink);
+             border:1px solid var(--line-strong); border-radius:4px; padding:9px;
+             font:12px/1.5 var(--mono); }
+  select, input[type=text], input[type=number] {
+    background:var(--surface); color:var(--ink); border:1px solid var(--line-strong);
+    border-radius:4px; padding:7px 8px; font:13px var(--sans);
+  }
+  button { background:var(--gold); color:#12231a; border:0; border-radius:4px;
+           padding:8px 15px; font:700 13px var(--sans); cursor:pointer; margin:8px 8px 0 0;
+           letter-spacing:.01em; }
+  button:hover { filter:brightness(1.08); }
+  button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line-strong); }
+  button.ghost:hover { color:var(--ink); border-color:var(--gold); filter:none; }
+  button.danger { color:var(--bad); border-color:rgba(181,101,74,.45); }
+  button.small { padding:4px 10px; font-size:11.5px; margin:0; }
+  .tagrow { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:9px; }
+
+  .foot { color:var(--label); font-size:10.5px; margin-top:26px;
+          padding-top:14px; border-top:1px solid var(--line); line-height:1.6; }
+  #msg { color:var(--gold); font-size:12.5px; min-height:17px; margin-top:8px; }
+  details summary { cursor:pointer; color:var(--label); font-size:12px; padding:5px 0; }
+  details summary:hover { color:var(--dim); }
+  /* Course view is mobile-first: narrower wrap, bigger touch targets/numerals */
+  .wrap { max-width:460px; }
+  .ladder .val { font-size:22px; width:74px; flex:0 0 74px; }
+  .ladder .nm { font-size:14px; }
+  .subline { font-size:11.5px; color:var(--label); padding:0 0 10px 76px; margin-top:-4px;
+             display:flex; justify-content:space-between; gap:10px; }
+  .reminders { border:1px solid var(--line-strong); border-radius:6px; padding:12px 14px;
+               margin-bottom:20px; }
+  .reminders h2 { color:var(--gold); margin:0 0 8px; font:600 10.5px/1 var(--sans);
+                  text-transform:uppercase; letter-spacing:.1em; }
+  .empty { color:var(--dim); font-size:13.5px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <div>
+      <h1>Golf Caddy <span>/ Course</span></h1>
+      <div class="sub" id="updated">On-course reference</div>
+    </div>
+  </div>
+  <div id="view"></div>
+  <div class="foot">
+    Read-only. Distances are clean-shot medians after mishit quarantine.
+    <a href="#" onclick="document.getElementById('imp').click();return false" style="color:var(--gold)">Refresh data (import)</a>
+    · <a href="range.html" style="color:var(--gold)">Full analyzer →</a>
+    <input type="file" id="imp" style="display:none" onchange="doImport(event)">
+    <div id="msg"></div>
+  </div>
+</div>
+
+<script>
+/*ENGINE-START*/
+// ── Unit conversion ──────────────────────────────────────────────────────────
+// NOTE: declared with `var` (not `const`) deliberately — the test harness uses
+// a direct eval to extract this block, and per JS spec only `var`/`function`
+// declarations leak into the caller's scope from a direct eval; `const`/`let`
+// stay trapped in the eval's own lexical environment. Matters here because,
+// unlike index.html's helpers, these are referenced directly by name in tests.
+var M_TO_YD = 1.09361;
+var MS_TO_MPH = 2.23694;
+
+// ── Shared numeric helpers (same as index.html's engine) ─────────────────────
+function quantile(sorted, q) {
+  if (!sorted.length) return null;
+  const pos = (sorted.length - 1) * q, lo = Math.floor(pos);
+  return lo + 1 < sorted.length ? sorted[lo] + (sorted[lo + 1] - sorted[lo]) * (pos - lo) : sorted[lo];
+}
+var median = a => quantile([...a].sort((x, y) => x - y), 0.5);
+var mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+var r1 = v => v === null || v === undefined || isNaN(v) ? null : Math.round(v * 10) / 10;
+
+// ── Club table: canonical name, bag order (driver→wedges), club class for
+// smash-factor floors. Regexes match Trackman's short codes case-insensitively.
+const CLUB_TABLE = [
+  { re:/^(dr|driver|1w)$/i, name:'Driver',   order:0,  klass:'driver' },
+  { re:/^(2w)$/i,           name:'2-Wood',   order:1,  klass:'wood' },
+  { re:/^(3w)$/i,           name:'3-Wood',   order:2,  klass:'wood' },
+  { re:/^(4w)$/i,           name:'4-Wood',   order:3,  klass:'wood' },
+  { re:/^(5w)$/i,           name:'5-Wood',   order:4,  klass:'wood' },
+  { re:/^(7w)$/i,           name:'7-Wood',   order:5,  klass:'wood' },
+  { re:/^(2h|h2)$/i,        name:'2-Hybrid', order:6,  klass:'hybrid' },
+  { re:/^(3h|h3)$/i,        name:'3-Hybrid', order:7,  klass:'hybrid' },
+  { re:/^(4h|h4)$/i,        name:'4-Hybrid', order:8,  klass:'hybrid' },
+  { re:/^(5h|h5)$/i,        name:'5-Hybrid', order:9,  klass:'hybrid' },
+  { re:/^(6h|h6)$/i,        name:'6-Hybrid', order:10, klass:'hybrid' },
+  { re:/^(7h|h7)$/i,        name:'7-Hybrid', order:11, klass:'hybrid' },
+  { re:/^(2i)$/i,           name:'2-Iron',   order:12, klass:'iron' },
+  { re:/^(3i)$/i,           name:'3-Iron',   order:13, klass:'iron' },
+  { re:/^(4i)$/i,           name:'4-Iron',   order:14, klass:'iron' },
+  { re:/^(5i)$/i,           name:'5-Iron',   order:15, klass:'iron' },
+  { re:/^(6i)$/i,           name:'6-Iron',   order:16, klass:'iron' },
+  { re:/^(7i)$/i,           name:'7-Iron',   order:17, klass:'iron' },
+  { re:/^(8i)$/i,           name:'8-Iron',   order:18, klass:'iron' },
+  { re:/^(9i)$/i,           name:'9-Iron',   order:19, klass:'iron' },
+  { re:/^(pw)$/i,           name:'PW',       order:20, klass:'wedge' },
+  { re:/^(gw|aw)$/i,        name:'GW',       order:21, klass:'wedge' },
+  { re:/^(sw)$/i,           name:'SW',       order:22, klass:'wedge' },
+  { re:/^(lw)$/i,           name:'LW',       order:23, klass:'wedge' },
+];
+function canonicalClub(code) {
+  const c = (code || '').trim();
+  for (const row of CLUB_TABLE) if (row.re.test(c)) return { code: c, name: row.name, order: row.order, klass: row.klass };
+  return { code: c, name: c || 'Unknown', order: 999, klass: 'unknown' };
+}
+function clubByName(name) {
+  const row = CLUB_TABLE.find(c => c.name === name);
+  return row ? { code: name, name: row.name, order: row.order, klass: row.klass } : null;
+}
+
+// Escape any string that came from a paste before it touches innerHTML.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ── Trackman paste parsing infrastructure ─────────────────────────────────────
+// Metric keywords, in the priority order used to identify a column. Order here
+// does NOT determine output column order — the header's left-to-right order does.
+const METRIC_KEYWORDS = [
+  { key:'clubSpeed',   kws:['club speed'] },
+  { key:'attackAngle', kws:['attack ang'] },
+  { key:'ballSpeed',   kws:['ball speed'] },
+  { key:'spin',        kws:['spin rate', 'spin'] },
+  { key:'launch',      kws:['launch ang'] },
+  { key:'carry',       kws:['carry'] },
+  { key:'total',       kws:['total'] },
+  { key:'side',        kws:['side'] },
+  { key:'height',      kws:['height', 'apex'] },
+  { key:'curve',       kws:['curve'] },
+  { key:'smash',       kws:['smash'] },
+];
+function splitCells(line) { return line.split('\t').map(c => c.trim()); }
+
+// Finds the header line by scanning for known metric keywords. Column order in
+// the RESULT follows the order keywords appear in the line, NOT their raw cell
+// index — Trackman's header has a leading garbage cell that data rows lack, so
+// index-based alignment would be wrong (see design decision #4 above).
+function findHeaderCols(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const cells = splitCells(lines[i]);
+    const cols = [];
+    cells.forEach(cell => {
+      const h = cell.toLowerCase();
+      if (!h) return;
+      for (const m of METRIC_KEYWORDS) {
+        if (m.kws.some(k => h.includes(k))) { cols.push(m.key); return; }
+      }
+    });
+    if (cols.includes('clubSpeed') && cols.includes('ballSpeed') && cols.includes('carry'))
+      return { idx: i, cols };
+  }
+  return null;
+}
+
+// The unit row is within a few lines after the header and has exactly N
+// unit-shaped tokens (m/s, mph, deg, rpm, m, yds).
+function findUnitRow(lines, headerIdx, n) {
+  for (let i = headerIdx + 1; i < Math.min(lines.length, headerIdx + 4); i++) {
+    const toks = splitCells(lines[i]).filter(t => t);
+    if (toks.length === n && toks.every(t => /^(m\/s|mph|deg|rpm|m|yds?|kph)$/i.test(t)))
+      return toks;
+  }
+  return null;
+}
+function unitsFromRow(cols, unitRow) {
+  if (!unitRow) return { distance: 'm', speed: 'm/s' };
+  const ci = cols.indexOf('carry'), si = cols.indexOf('clubSpeed');
+  const distance = ci >= 0 && /yd/i.test(unitRow[ci]) ? 'yd' : 'm';
+  const speed = si >= 0 && /mph/i.test(unitRow[si]) ? 'mph' : 'm/s';
+  return { distance, speed };
+}
+
+// Date is a bare ISO line (Trackman's own format) above the header.
+function findDate(lines, headerIdx) {
+  for (let i = 0; i < headerIdx; i++) {
+    const m = lines[i].trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return { date: lines[i].trim(), idx: i };
+  }
+  return null;
+}
+// Club code: first non-empty, non-icon, non-date line above the header. The
+// nickname line that follows it is deliberately ignored (design Q&A: parse
+// the short code, not the user's custom nickname).
+function findClubCode(lines, headerIdx, dateIdx) {
+  for (let i = 0; i < headerIdx; i++) {
+    if (i === dateIdx) continue;
+    const l = lines[i].trim();
+    if (!l || /icon/i.test(l)) continue;
+    return l;
+  }
+  return null;
+}
+
+// ── Trackman shot-row and footer parsing ──────────────────────────────────────
+function parseSideToken(tok) {
+  const m = String(tok).trim().match(/^(-?\d+\.?\d*)\s*([LR])?$/i);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  if (isNaN(v)) return null;
+  return (m[2] && m[2].toUpperCase() === 'L') ? -v : v;
+}
+function parseNum(tok) { const v = parseFloat(tok); return isNaN(v) ? null : v; }
+
+// A shot row's non-empty tab-split tokens must exactly match the column count.
+// Icon/index noise lines never have this shape and fall through untouched.
+function tryParseShotRow(line, cols) {
+  const toks = splitCells(line).filter(t => t !== '');
+  if (toks.length !== cols.length) return null;
+  const shot = {};
+  for (let i = 0; i < cols.length; i++) {
+    const key = cols[i], tok = toks[i];
+    const v = key === 'side' ? parseSideToken(tok) : parseNum(tok);
+    if (v === null) return null;
+    shot[key] = v;
+  }
+  return shot;
+}
+// Average/Consistency rows carry a label and sometimes an icon placeholder
+// token before the numbers — filter to numeric-shaped tokens and take the
+// last N (N = column count), which sidesteps the label/icon entirely.
+function parseFooterRow(line, cols) {
+  const label = (line.match(/^(Average|Consistency)\b/i) || [])[1];
+  if (!label) return null;
+  const toks = splitCells(line).filter(t => t !== '');
+  const nums = toks.filter(t => parseSideToken(t) !== null || !isNaN(parseFloat(t)));
+  const vals = nums.slice(-cols.length);
+  if (vals.length !== cols.length) return null;
+  const row = {};
+  for (let i = 0; i < cols.length; i++) {
+    const key = cols[i];
+    row[key] = key === 'side' ? parseSideToken(vals[i]) : parseNum(vals[i]);
+  }
+  return { label: label.toLowerCase(), row };
+}
+function normalizeShotUnits(shot, units) {
+  const s = { ...shot };
+  const dFactor = units.distance === 'yd' ? (1 / M_TO_YD) : 1;
+  const vFactor = units.speed === 'mph' ? (1 / MS_TO_MPH) : 1;
+  ['carry', 'total', 'side', 'height'].forEach(k => { if (s[k] != null) s[k] = s[k] * dFactor; });
+  ['clubSpeed', 'ballSpeed'].forEach(k => { if (s[k] != null) s[k] = s[k] * vFactor; });
+  return s;
+}
+// Compares the session's own computed column means against Trackman's stated
+// Average row. A mismatch beyond tolerance means the parse likely misread this
+// specific paste — shown as a data-quality verdict, not silently trusted.
+function checkAgainstReported(session, reportedAverage) {
+  const mismatches = [];
+  Object.keys(reportedAverage).forEach(k => {
+    const rv = reportedAverage[k];
+    if (rv == null) return;
+    const vals = session.shots.map(s => s[k]).filter(v => v != null);
+    if (!vals.length) return;
+    const cm = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const tol = Math.max(Math.abs(rv) * 0.08, 0.5);
+    if (Math.abs(cm - rv) > tol) mismatches.push({ key: k, reported: r1(rv), computed: r1(cm) });
+  });
+  return { date: session.date, club: session.club.name, ok: mismatches.length === 0, mismatches };
+}
+
+function parseTrackman(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim() !== '');
+  const h = findHeaderCols(lines);
+  if (!h) return { sessions: [], skipped: [text], checks: [] };
+  const { idx: headerIdx, cols } = h;
+  const unitRow = findUnitRow(lines, headerIdx, cols.length);
+  const units = unitsFromRow(cols, unitRow);
+  const dateInfo = findDate(lines, headerIdx);
+  const dateAssumed = !dateInfo;
+  const date = dateInfo ? dateInfo.date : new Date().toISOString().slice(0, 10);
+  const clubCode = findClubCode(lines, headerIdx, dateInfo ? dateInfo.idx : -1) || '';
+  const club = canonicalClub(clubCode);
+
+  let scanFrom = headerIdx + 1;
+  for (let i = headerIdx + 1; i < Math.min(lines.length, headerIdx + 4); i++) {
+    const toks = splitCells(lines[i]).filter(t => t);
+    if (toks.length === cols.length && toks.every(t => /^(m\/s|mph|deg|rpm|m|yds?|kph)$/i.test(t))) {
+      scanFrom = i + 1; break;
+    }
+  }
+
+  const shots = [], skipped = [];
+  let reportedAverage = null;
+  for (let i = scanFrom; i < lines.length; i++) {
+    const line = lines[i];
+    const footer = parseFooterRow(line, cols);
+    if (footer) {
+      if (footer.label === 'average') reportedAverage = normalizeShotUnits(footer.row, units);
+      continue;
+    }
+    const shot = tryParseShotRow(line, cols);
+    if (shot) { shots.push(normalizeShotUnits(shot, units)); continue; }
+    if (/icon/i.test(line) || /^\d+\.$/.test(line.trim())) continue; // known noise
+    skipped.push(line);
+  }
+  if (!shots.length) return { sessions: [], skipped: [text], checks: [] };
+
+  const session = { date, dateAssumed, clubCode, club, tags: {}, shots };
+  const checks = reportedAverage ? [checkAgainstReported(session, reportedAverage)] : [];
+  return { sessions: [session], skipped, checks };
+}
+
+// ── Generic adapter: any launch monitor export with a header row ─────────────
+// Well-formed table (unlike Trackman's paste), so columns are found by keyword
+// once and then read by raw index — same approach as index.html's parseGeneric.
+const p2 = x => String(x).padStart(2, '0');
+function parseDateLoose(s) {
+  s = (s || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${p2(m[2])}-${p2(m[3])}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${p2(m[1])}-${p2(m[2])}`;
+  return s || '0000-00-00';
+}
+// Other launch monitors typically export spelled-out club names ("7 Iron",
+// "Pitching Wedge") rather than Trackman's short codes ("7i", "PW"). CLUB_TABLE
+// already accepts the spelled-out word for Driver (re includes "driver"), but
+// the numbered classes only match short codes — so translate common long forms
+// to short codes here before handing off to canonicalClub, leaving CLUB_TABLE
+// (shared with the Trackman adapter) untouched.
+function normalizeClubCode(raw) {
+  const s = (raw || '').trim();
+  let m = s.match(/^(\d+)\s*-?\s*iron$/i);
+  if (m) return m[1] + 'i';
+  m = s.match(/^(\d+)\s*-?\s*wood$/i);
+  if (m) return m[1] + 'w';
+  m = s.match(/^(\d+)\s*-?\s*hybrid$/i);
+  if (m) return m[1] + 'h';
+  if (/^pitching\s*-?\s*wedge$/i.test(s)) return 'pw';
+  if (/^(gap|approach)\s*-?\s*wedge$/i.test(s)) return 'gw';
+  if (/^sand\s*-?\s*wedge$/i.test(s)) return 'sw';
+  if (/^lob\s*-?\s*wedge$/i.test(s)) return 'lw';
+  return s;
+}
+function parseGenericLM(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
+  if (lines.length < 2) return { sessions: [], skipped: [], checks: [] };
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+  const split = l => {
+    if (delim === '\t') return l.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      if (ch === '"') { if (q && l[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === ',' && !q) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map(c => c.trim());
+  };
+  const H = split(lines[0]).map(h => h.toLowerCase());
+  const find = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  const findClub = () => {
+    const exact = H.findIndex(h => h === 'club' || h === 'club type' || h === 'club name');
+    if (exact >= 0) return exact;
+    return H.findIndex(h => h.includes('club') && !h.includes('speed'));
+  };
+  const col = {
+    date: find('date'), club: findClub(),
+    clubSpeed: find('club speed', 'clubhead speed'), attackAngle: find('attack'),
+    ballSpeed: find('ball speed'), spin: find('spin'), launch: find('launch'),
+    carry: find('carry'), total: find('total'), side: find('side', 'offline'),
+    height: find('height', 'apex'), smash: find('smash'),
+  };
+  const num = (c, i) => {
+    if (i < 0 || c[i] === undefined || c[i] === '') return null;
+    const v = parseFloat(String(c[i]).replace('%', ''));
+    return isNaN(v) ? null : v;
+  };
+  const side = (c, i) => (i < 0 || c[i] === undefined || c[i] === '') ? null : parseSideToken(c[i]);
+  const skipped = [], byKey = {};
+  lines.slice(1).forEach(line => {
+    const c = split(line);
+    const clubCode = col.club >= 0 ? c[col.club] : '';
+    if (!clubCode || (col.clubSpeed < 0 && col.ballSpeed < 0 && col.carry < 0)) { skipped.push(line); return; }
+    const date = parseDateLoose(col.date >= 0 ? c[col.date] : '');
+    const club = canonicalClub(normalizeClubCode(clubCode));
+    const shot = {
+      clubSpeed: num(c, col.clubSpeed), attackAngle: num(c, col.attackAngle),
+      ballSpeed: num(c, col.ballSpeed), spin: num(c, col.spin), launch: num(c, col.launch),
+      carry: num(c, col.carry), total: num(c, col.total), side: side(c, col.side),
+      height: num(c, col.height), smash: num(c, col.smash),
+    };
+    const key = `${date}|${club.name}`;
+    (byKey[key] = byKey[key] || { date, dateAssumed: col.date < 0, clubCode, club, tags: {}, shots: [] }).shots.push(shot);
+  });
+  return { sessions: Object.values(byKey), skipped, checks: [] };
+}
+
+// var, not const: T9 references SOURCES by bare name outside the eval() that
+// loads this block, and direct eval only leaks var/function declarations to
+// the caller's scope, never const/let (see Task 1's finding on this exact issue).
+var SOURCES = {
+  trackman: { label: 'Trackman (range table)', parse: parseTrackman },
+  generic:  { label: 'Other launch monitor (CSV/table)', parse: parseGenericLM },
+};
+
+// ── Merge: same date + same club = one club-session; shots dedup exactly ─────
+function shotKey(s) {
+  // 1 decimal, not 3: matches Trackman's actual display precision (e.g. 31.9,
+  // 116.0, 8.4 in real paste data). This substantially reduces (but does not
+  // fully eliminate) mismatches from unit-conversion round-trip noise
+  // (yards<->meters) if the SAME physical shots are re-pasted after a display-
+  // unit change — a real but likely rare scenario. The tested, common case
+  // (re-pasting identical text) is unaffected: identical input always produces
+  // identical floats regardless of rounding precision.
+  // Guard with typeof (not just `== null`): this is the 4th code-review round
+  // to find a "malformed data persists then crashes on next access" bug at
+  // this data boundary (doImport validation has been patched three times,
+  // each time chasing the next field one level deeper). shotKey is the
+  // actual shared chokepoint every caller funnels through (mergeClubSessions,
+  // called by both doParse's normal paste-and-save and doImport), so
+  // hardening it here — rather than doImport's validation alone — protects
+  // every current and future caller permanently. A non-numeric/garbage field
+  // (e.g. a corrupted shot with {carry: "150"} that was persisted via some
+  // other path) degrades safely to '' in the fingerprint instead of throwing
+  // `s[k].toFixed is not a function`; worst case is a dedup-key collision
+  // between two garbage values, which is far better than crashing the app.
+  return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
+    .map(k => typeof s[k] === 'number' && !isNaN(s[k]) ? s[k].toFixed(1) : '').join('|');
+}
+function mergeClubSessions(existing, incoming) {
+  const key = cs => `${cs.date}|${cs.club.name}`;
+  const map = {};
+  existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } }; });
+  let addedShots = 0;
+  incoming.forEach(cs => {
+    const k = key(cs);
+    if (!map[k]) {
+      map[k] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } };
+      addedShots += cs.shots.length;
+    } else {
+      const seen = new Set(map[k].shots.map(shotKey));
+      cs.shots.forEach(s => {
+        const sk = shotKey(s);
+        if (!seen.has(sk)) { map[k].shots.push(s); seen.add(sk); addedShots++; }
+      });
+      map[k].tags = { ...cs.tags, ...map[k].tags };
+    }
+  });
+  const all = Object.values(map).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : a.club.order - b.club.order);
+  return { all, addedShots };
+}
+
+// ── Mishit quarantine ──────────────────────────────────────────────────────────
+// Smash-factor floor by club class — below this, the strike itself was bad
+// regardless of where the ball ended up. Tunable, like index.html's EXP_PUTT_GIR.
+// iron:1.15 is calibrated against the real 7i sample, not a textbook number: the
+// 12 real shots cluster 1.19-1.34 except shot2 (1.11, clearly a mishit) — a
+// textbook-plausible 1.25 floor would incorrectly also flag shots 4 (1.189) and
+// 5 (1.201), which are ordinary shots, not mishits. driver/wood/hybrid are
+// unverified estimates (no real sample for those classes yet) and may need the
+// same calibration once one exists.
+const SMASH_FLOOR = { driver: 1.35, wood: 1.30, hybrid: 1.28, iron: 1.15, wedge: 1.15, unknown: 1.20 };
+const SPIN_FLIER_RATIO = 0.5;   // thin-flier spin threshold, as a fraction of reference median spin
+const MIN_SHOTS_STABLE = 6;     // below this, a session's own median is unreliable as a reference
+
+function smashFactor(shot) {
+  if (shot.smash != null) return shot.smash;
+  if (shot.ballSpeed != null && shot.clubSpeed) return shot.ballSpeed / shot.clubSpeed;
+  return null;
+}
+// A reference is "stable" when it has enough shots with USABLE (non-null)
+// spin AND carry to trust a median computed from them — not merely enough
+// raw shots. A session can have plenty of shots but only a couple with real
+// spin/carry (e.g. a partial-column launch-monitor export); gating on raw
+// count would let a 2-value "median" masquerade as a 6-shot-stable one.
+function stableRef(shots) {
+  const spins = shots.map(s => s.spin).filter(v => v != null);
+  const carries = shots.map(s => s.carry).filter(v => v != null);
+  return (spins.length >= MIN_SHOTS_STABLE && carries.length >= MIN_SHOTS_STABLE)
+    ? { medSpin: median(spins), medCarry: median(carries) } : null;
+}
+// sessions: all stored club-sessions for ONE club, any order. Returns the same
+// shape with each shot annotated { smash, quarantined, quarantineReason }.
+// Reference medians for the thin-flier rule fall back session→cross-session→
+// skip-the-rule, per the design spec's "How to apply" note on SPIN_FLIER_RATIO.
+function quarantineClub(sessions) {
+  if (!sessions.length) return sessions;
+  const allShots = sessions.flatMap(s => s.shots);
+  const klass = sessions[0].club.klass;
+  const floor = SMASH_FLOOR[klass] || SMASH_FLOOR.unknown;
+
+  return sessions.map(sess => {
+    // Reference for the thin-flier medians: this session's own shots if there
+    // are enough with usable spin/carry to trust; otherwise the pooled
+    // cross-session history for this club IF that pool itself has enough
+    // usable shots; otherwise null, which disables the thin-flier check
+    // entirely (medSpin/medCarry stay null below) rather than computing an
+    // "unstable" median from too few shots either way.
+    const own = stableRef(sess.shots);
+    const pooled = own ? null : stableRef(allShots);
+    const { medSpin, medCarry } = own || pooled || { medSpin: null, medCarry: null };
+    const shots = sess.shots.map(s => {
+      const sm = smashFactor(s);
+      const badStrike = sm != null && sm < floor;
+      const thinFlier = !badStrike && medSpin != null && medCarry != null && s.spin != null && s.carry != null &&
+        s.spin < medSpin * SPIN_FLIER_RATIO && s.carry < medCarry;
+      const reason = badStrike ? 'bad_strike' : (thinFlier ? 'thin_flier' : null);
+      return { ...s, smash: sm, quarantined: !!reason, quarantineReason: reason };
+    });
+    return { ...sess, tags: { ...sess.tags }, shots };
+  });
+}
+
+// ── Grouping + gapping ────────────────────────────────────────────────────────
+// Groups stored club-sessions by club name, sorts each group's sessions by
+// date, and runs the mishit quarantine once per group. Downstream consumers
+// (gapping table, verdicts) both read from this shared structure rather than
+// re-grouping/re-quarantining independently.
+function groupByClub(clubSessions) {
+  const byClub = {};
+  clubSessions.forEach(cs => { (byClub[cs.club.name] = byClub[cs.club.name] || []).push(cs); });
+  return Object.keys(byClub).map(name => ({
+    name,
+    sessions: quarantineClub(byClub[name].slice().sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0))),
+  }));
+}
+function computeGapping(groups) {
+  const rows = groups.map(g => {
+    const allShots = g.sessions.flatMap(s => s.shots);
+    const clean = allShots.filter(s => !s.quarantined);
+    const carries = clean.map(s => s.carry).filter(v => v != null);
+    const sides = clean.map(s => s.side).filter(v => v != null);
+    const medCarry = median(carries);
+    const club = g.sessions[0].club;
+    return {
+      name: g.name, order: club.order, klass: club.klass,
+      cleanCarryYd: medCarry != null ? medCarry * M_TO_YD : null,
+      mishitRate: allShots.length ? 1 - clean.length / allShots.length : null,
+      sideBiasYd: sides.length ? mean(sides) * M_TO_YD : null,
+      n: clean.length, totalN: allShots.length,
+      lowConfidence: clean.length < 5,
+      sessionCount: g.sessions.length,
+      lastSeen: g.sessions[g.sessions.length - 1].date,
+    };
+  }).sort((a, b) => a.order - b.order);
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (rows[i].cleanCarryYd != null && rows[i + 1].cleanCarryYd != null) {
+      rows[i].gapToNext = rows[i].cleanCarryYd - rows[i + 1].cleanCarryYd;
+      rows[i].gapWarning = rows[i].gapToNext < 8 || rows[i].gapToNext > 20;
+    } else { rows[i].gapToNext = null; rows[i].gapWarning = false; }
+  }
+  if (rows.length) { rows[rows.length - 1].gapToNext = null; rows[rows.length - 1].gapWarning = false; }
+  return rows;
+}
+
+// ── Trend: most recent 2 sessions vs previous 3, per club ────────────────────
+// "Session" here means a club-session for THIS club specifically — sessions
+// where the club wasn't hit are absent from the array entirely, so a club hit
+// on 5 visits gets a full window even with other clubs' visits interleaved.
+function computeTrend(sessions) {
+  // Defensive sort: don't trust caller order. groupByClub sorts before calling
+  // us today, but index.html shipped this exact bug once (commit 9ba2fc4) —
+  // an unsorted array here would silently swap "recent" vs "baseline" and
+  // produce an inverted-but-plausible-looking trend verdict.
+  sessions = [...sessions].sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+  const n = sessions.length;
+  if (n < 3) return { enough: false, reason: 'not enough sessions' };
+  const recent = sessions.slice(-2);
+  const baseline = sessions.slice(-5, -2);
+  if (recent.length < 1 || baseline.length < 2) return { enough: false, reason: 'not enough sessions' };
+
+  const allShots = arr => arr.flatMap(s => s.shots);
+  const cleanShots = arr => allShots(arr).filter(sh => !sh.quarantined);
+  const recentAll = allShots(recent), baselineAll = allShots(baseline);
+  const recentClean = cleanShots(recent), baselineClean = cleanShots(baseline);
+  if (recentClean.length < 5 || baselineClean.length < 5) return { enough: false, reason: 'not enough clean shots' };
+
+  // Ball/weather confounder split: caveat unless BOTH sides are fully tagged
+  // AND every session on both sides shares identical conditions.
+  const tagKey = s => JSON.stringify(s.tags || {});
+  const hasKnownTags = s => !!(s.tags && (s.tags.ball || s.tags.venue || s.tags.tempF != null));
+  const allTagged = [...recent, ...baseline].every(hasKnownTags);
+  const recentKeys = new Set(recent.map(tagKey)), baselineKeys = new Set(baseline.map(tagKey));
+  const sameConditions = allTagged && recentKeys.size === 1 && baselineKeys.size === 1 &&
+                          [...recentKeys][0] === [...baselineKeys][0];
+  const caveat = !sameConditions;
+
+  const med = (shots, key) => median(shots.map(s => s[key]).filter(v => v != null));
+  const rate = (all, clean) => all.length ? 1 - clean.length / all.length : null;
+
+  return {
+    enough: true, caveat,
+    // ball/weather-independent — compared freely
+    clubSpeed:   { recent: med(recentClean, 'clubSpeed'),   baseline: med(baselineClean, 'clubSpeed') },
+    attackAngle: { recent: med(recentClean, 'attackAngle'), baseline: med(baselineClean, 'attackAngle') },
+    sideBias:    { recent: mean(recentClean.map(s => s.side).filter(v => v != null)),
+                   baseline: mean(baselineClean.map(s => s.side).filter(v => v != null)) },
+    mishitRate:  { recent: rate(recentAll, recentClean), baseline: rate(baselineAll, baselineClean) },
+    // ball/weather-dependent — caveated when conditions differ or are unknown
+    carry:     { recent: med(recentClean, 'carry'),     baseline: med(baselineClean, 'carry') },
+    ballSpeed: { recent: med(recentClean, 'ballSpeed'), baseline: med(baselineClean, 'ballSpeed') },
+    spin:      { recent: med(recentClean, 'spin'),      baseline: med(baselineClean, 'spin') },
+  };
+}
+
+// ── Verdicts ───────────────────────────────────────────────────────────────────
+function computeVerdicts(groups, gaps, checks) {
+  const v = [];
+  let anyEnoughData = false;
+  groups.forEach(g => {
+    const t = computeTrend(g.sessions);
+    if (!t.enough) return;
+    anyEnoughData = true;
+    if (t.carry.recent != null && t.carry.baseline != null) {
+      const carryD = (t.carry.recent - t.carry.baseline) * M_TO_YD;
+      if (Math.abs(carryD) >= 3) {
+        v.push({ tone: carryD > 0 ? 'good' : 'bad',
+          text: `<b>${esc(g.name)} carry ${carryD > 0 ? 'up' : 'down'} ${r1(Math.abs(carryD))} yds:</b> last 2 sessions vs previous 3.` +
+                (t.caveat ? ' Session conditions differ or are untagged — ball/weather may explain part of this.' : '') });
+      }
+    }
+    if (t.mishitRate.recent != null && t.mishitRate.baseline != null) {
+      const mrD = (t.mishitRate.baseline - t.mishitRate.recent) * 100;
+      if (Math.abs(mrD) >= 8) {
+        v.push({ tone: mrD > 0 ? 'good' : 'bad',
+          text: `<b>${esc(g.name)} mishit rate ${mrD > 0 ? 'down' : 'up'} ${r1(Math.abs(mrD))}%:</b> ${Math.round(t.mishitRate.recent * 100)}% recent vs ${Math.round(t.mishitRate.baseline * 100)}% previous.` });
+      }
+    }
+    if (t.sideBias.recent != null && Math.abs(t.sideBias.recent) * M_TO_YD >= 5) {
+      v.push({ tone: 'warn',
+        text: `<b>${esc(g.name)} side bias:</b> averaging ${r1(Math.abs(t.sideBias.recent) * M_TO_YD)} yds ${t.sideBias.recent > 0 ? 'right' : 'left'} of target recently.` });
+    }
+  });
+  gaps.forEach((g, i) => {
+    if (!g.gapWarning || g.gapToNext == null) return;
+    // -3 yds, not any negative value: below that a "crossed" gap is
+    // rounding/measurement noise (matches the carry-trend verdict's own
+    // 3-yd significance floor above), not a real fitting-implicating flip.
+    if (g.gapToNext < -3) {
+      v.push({ tone: 'bad', text: `<b>Crossed clubs:</b> ${esc(g.name)} carries ${r1(Math.abs(g.gapToNext))} yds LESS than ${esc(gaps[i + 1].name)} — check club fitting or whether mishits are dragging this club's number down.` });
+      return;
+    }
+    const dir = g.gapToNext < 8 ? 'tight' : 'wide';
+    v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(Math.abs(g.gapToNext))} yds apart.` });
+  });
+  (checks || []).filter(c => c && !c.ok).forEach(c => {
+    v.push({ tone: 'flat',
+      text: `<b>Data note:</b> parsed numbers for ${esc(c.club)} on ${esc(c.date)} don't match Trackman's own Average row — this paste may have mis-parsed. Check the shot list.` });
+  });
+  gaps.filter(g => g.lowConfidence).forEach(g => {
+    v.push({ tone: 'flat', text: `<b>Low confidence:</b> ${esc(g.name)} has only ${g.n} clean shot(s) recorded — gapping number is provisional.` });
+  });
+  if (!v.length) {
+    v.push({ tone: 'flat', text: anyEnoughData
+      ? 'No notable changes recently — carry, mishit rate, and side bias are all steady versus your baseline.'
+      : 'Not enough data yet for trend verdicts — keep pasting sessions.' });
+  }
+  return v;
+}
+
+// ── Saved-sessions list: one row per stored (date, club) entry, with quarantine
+// counts already applied — used by the UI's delete-a-session card. Pure/testable;
+// the DOM-touching delete action itself lives in the UI section below.
+function computeSavedSessionRows(groups) {
+  const rows = [];
+  groups.forEach(g => {
+    g.sessions.forEach(sess => {
+      const total = sess.shots.length;
+      const clean = sess.shots.filter(s => !s.quarantined).length;
+      rows.push({
+        date: sess.date, clubName: g.name, clean, total,
+        mishitRate: total ? Math.round((1 - clean / total) * 100) : null,
+      });
+    });
+  });
+  rows.sort((a, b) => a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)); // most recent first
+  return rows;
+}
+
+// A club-session's gap-to-next label, shared logic with computeVerdicts' own
+// tight/wide/crossed thresholds (kept as a separate small function here rather
+// than refactoring computeVerdicts itself, which has already been through
+// several review-driven fixes — not worth the regression risk for a DRY win).
+function gapLabel(gapToNext) {
+  if (gapToNext == null) return null;
+  if (gapToNext < -3) return 'CROSSED';
+  if (gapToNext < 8) return 'tight';
+  if (gapToNext > 20) return 'wide';
+  return null;
+}
+
+// ── Coach debrief prompt ──────────────────────────────────────────────────────
+// groups: same quarantined {name, sessions} groups computeGapping/computeVerdicts
+// already consumed — passed in (not recomputed) so this stays cheap and consistent
+// with what the rest of the page just rendered.
+function coachPrompt(gaps, verdicts, groups) {
+  const groupByName = {};
+  (groups || []).forEach(g => { groupByName[g.name] = g; });
+
+  const sign = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + r1(v);
+  const objectiveLines = gaps.map(g => {
+    const facts = `${g.name}: ${g.cleanCarryYd != null ? r1(g.cleanCarryYd) + ' yds median' : 'no clean-shot data'} ` +
+      `(${g.n}/${g.totalN} clean, mishit ${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : 'n/a'}` +
+      `${g.sideBiasYd != null ? `, bias ${r1(Math.abs(g.sideBiasYd))}${g.sideBiasYd >= 0 ? 'R' : 'L'}` : ''})` +
+      `${g.gapToNext != null ? `, gap to next ${r1(g.gapToNext)} yds${gapLabel(g.gapToNext) ? ` [${gapLabel(g.gapToNext)}]` : ''}` : ''}` +
+      `, last hit ${g.lastSeen}`;
+
+    const grp = groupByName[g.name];
+    const t = grp ? computeTrend(grp.sessions) : { enough: false };
+    let trendLine;
+    if (t.enough) {
+      const parts = [
+        `carry ${t.carry.recent != null && t.carry.baseline != null ? sign((t.carry.recent - t.carry.baseline) * M_TO_YD) : 'n/a'}`,
+        `ball speed ${t.ballSpeed.recent != null && t.ballSpeed.baseline != null ? sign(t.ballSpeed.recent - t.ballSpeed.baseline) : 'n/a'}`,
+        `spin ${t.spin.recent != null && t.spin.baseline != null ? sign(t.spin.recent - t.spin.baseline) : 'n/a'}`,
+        `club speed ${t.clubSpeed.recent != null && t.clubSpeed.baseline != null ? sign(t.clubSpeed.recent - t.clubSpeed.baseline) : 'n/a'}`,
+        `attack angle ${t.attackAngle.recent != null && t.attackAngle.baseline != null ? sign(t.attackAngle.recent - t.attackAngle.baseline) + 'deg' : 'n/a'}`,
+        `side bias ${t.sideBias.recent != null && t.sideBias.baseline != null ? sign((t.sideBias.recent - t.sideBias.baseline) * M_TO_YD) : 'n/a'}`,
+        `mishit rate ${t.mishitRate.recent != null && t.mishitRate.baseline != null ? sign((t.mishitRate.recent - t.mishitRate.baseline) * 100) + 'pp' : 'n/a'}`,
+      ];
+      trendLine = `  Trend (last 2 sessions vs previous 3): ${parts.join(', ')}` +
+        (t.caveat ? ' [session conditions vary or untagged — carry/ball speed/spin caveated]' : '');
+    } else {
+      trendLine = '  (not enough session history yet for a trend line)';
+    }
+    return facts + '\n' + trendLine;
+  }).join('\n');
+
+  return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my range data below — no generic tips.
+- FALDO (swing mechanics): tempo, fundamentals, repeatability.
+- BRYSON (data): ruthlessly quantitative, calls out what the numbers do and don't support.
+- FAXON (putting): stroke, green reading, speed.
+- PHIL (short game): chipping, pitching, scrambling — and gambler's course management.
+
+OBJECTIVE DATA SUMMARY (facts only — read this before forming any opinions):
+${objectiveLines || '(no clean-shot data yet)'}
+
+RECENT SIGNALS:
+${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n')}
+
+Debrief my ball-striking as a conversation between the four of you: what's real in the recent trend, what's noise, where you disagree, and end with ONE range priority each (a specific drill with success criteria), then a consensus pick for the single most valuable thing to work on next session.`;
+}
+
+// ── Course-view helpers ───────────────────────────────────────────────────────
+// Up to 3 verdicts for the on-course reminder box. Non-flat tones rank first
+// (a real problem or a real positive signal outranks a routine data-quality
+// note), then flat fills any remaining slots. Never mutates the input array.
+var REMINDER_CAP = 3;
+function pickReminders(verdicts) {
+  const rank = { bad: 0, warn: 1, good: 2 };
+  const ranked = (verdicts || []).filter(v => v && rank[v.tone] !== undefined)
+    .slice().sort((a, b) => rank[a.tone] - rank[b.tone]);
+  const flat = (verdicts || []).filter(v => v && rank[v.tone] === undefined);
+  return ranked.concat(flat).slice(0, REMINDER_CAP);
+}
+
+// Ladder rows for the bag: each club's bar width is its carry relative to the
+// longest club that has data. Clubs with no clean-shot carry are dropped
+// entirely — a course reference has no use for a "no data" row — and are
+// excluded from the max, so they can't skew the scale.
+function ladderRows(gaps) {
+  const usable = (gaps || []).filter(g => g && g.cleanCarryYd != null);
+  if (!usable.length) return [];
+  const maxCarry = Math.max(...usable.map(g => g.cleanCarryYd));
+  return usable.map(g => ({
+    name: g.name,
+    carry: Math.round(g.cleanCarryYd),
+    pct: maxCarry ? (g.cleanCarryYd / maxCarry * 100) : 0,
+    sideBiasYd: g.sideBiasYd,
+    mishitRate: g.mishitRate,
+  }));
+}
+/*ENGINE-END*/
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+// Same storage key as range.html: if this page is opened in the same browser
+// that entered the data, it just works. Cross-device (paste on laptop, read on
+// phone) goes through the import link, which merges rather than replaces.
+const LS = 'golfcaddy_range';
+const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
+const save = cs => localStorage.setItem(LS, JSON.stringify(cs));
+function msg(t) { document.getElementById('msg').textContent = t; }
+
+function render() {
+  const clubSessions = load();
+  const view = document.getElementById('view');
+  if (!clubSessions.length) {
+    view.innerHTML = '<div class="sec"><h2>No data on this device</h2><div class="empty">Export your range data from the analyzer on your computer, get the file onto this phone, then tap <b>Refresh data (import)</b> below.</div></div>';
+    return;
+  }
+  const groups = groupByClub(clubSessions);
+  const gaps = computeGapping(groups);
+  const verdicts = computeVerdicts(groups, gaps, []);
+  const reminders = pickReminders(verdicts);
+  const rows = ladderRows(gaps);
+
+  const lastSeen = gaps.map(g => g.lastSeen).filter(Boolean).sort().pop();
+  document.getElementById('updated').textContent = lastSeen ? `Updated ${lastSeen}` : 'On-course reference';
+
+  const remindersHtml = reminders.length ? `<div class="reminders">
+    <h2>Today's reminders</h2>
+    ${reminders.map(v => `<div class="note ${v.tone}"><span class="dot"></span><span class="txt">${v.text}</span></div>`).join('')}
+  </div>` : '';
+
+  const bagHtml = rows.length ? rows.map(r => {
+    const side = r.sideBiasYd == null ? ''
+      : (Math.abs(r.sideBiasYd) < 1 ? 'Straight, on average'
+        : `${Math.round(Math.abs(r.sideBiasYd))} yds ${r.sideBiasYd >= 0 ? 'right' : 'left'}, on average`);
+    const mishit = r.mishitRate == null ? '' : `${Math.round(r.mishitRate * 100)}% mishit`;
+    return `<div class="ladder">
+      <span class="nm">${esc(r.name)}</span>
+      <span class="track"><span class="fill" style="width:${r.pct.toFixed(1)}%"></span></span>
+      <span class="val">${r.carry}<small> yd</small></span>
+    </div>
+    <div class="subline"><span>${esc(side)}</span><span>${esc(mishit)}</span></div>`;
+  }).join('') : '<div class="empty">No clubs with clean-shot data yet.</div>';
+
+  view.innerHTML = `${remindersHtml}<div class="sec"><h2>Your bag</h2>${bagHtml}</div>`;
+}
+
+// Import: identical validation to range.html's doImport — this is the hardened
+// version that took three code-review rounds (malformed JSON silently failing,
+// then shots:[null] persisting and permanently breaking render, then
+// non-numeric shot fields crashing shotKey on the NEXT merge). Do not simplify.
+function doImport(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    let parsed;
+    try {
+      parsed = JSON.parse(t);
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      parsed.forEach(cs => {
+        if (!cs || typeof cs.date !== 'string' || !cs.club || typeof cs.club.name !== 'string' || typeof cs.club.order !== 'number' || !Array.isArray(cs.shots)) {
+          throw new Error('malformed club-session');
+        }
+        const NUM_FIELDS = ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'launch', 'carry', 'total', 'side', 'height', 'smash'];
+        if (!cs.shots.every(s => s && typeof s === 'object' && NUM_FIELDS.every(k => s[k] == null || typeof s[k] === 'number'))) {
+          throw new Error('malformed shot');
+        }
+      });
+    } catch (e) {
+      msg('Import failed — this file doesn\'t look like a valid golf-range export.');
+      return;
+    }
+    try {
+      const { all, addedShots } = mergeClubSessions(load(), parsed);
+      save(all);
+      msg(`Imported ${addedShots} new shots.`);
+      render();
+    } catch (e) {
+      console.error(e);
+      msg('Import failed unexpectedly after the file was read — please report this.');
+    }
+  }).catch(() => msg('Import failed — could not read the file.'));
+}
+
+render();
+
+</script>
+</body>
+</html>
