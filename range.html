@@ -811,18 +811,25 @@ function doImport(ev) {
       parsed = JSON.parse(t);
       if (!Array.isArray(parsed)) throw new Error('not an array');
       parsed.forEach(cs => {
-        if (!cs || typeof cs.date !== 'string' || !cs.club || typeof cs.club.name !== 'string' || !Array.isArray(cs.shots)) {
+        if (!cs || typeof cs.date !== 'string' || !cs.club || typeof cs.club.name !== 'string' || typeof cs.club.order !== 'number' || !Array.isArray(cs.shots)) {
           throw new Error('malformed club-session');
+        }
+        if (!cs.shots.every(s => s && typeof s === 'object')) {
+          throw new Error('malformed shot');
         }
       });
     } catch (e) {
       msg('Import failed — this file doesn\'t look like a valid golf-range export.');
       return;
     }
-    const { all, addedShots } = mergeClubSessions(load(), parsed);
-    save(all);
-    msg(`Imported ${addedShots} new shots.`);
-    render();
+    try {
+      const { all, addedShots } = mergeClubSessions(load(), parsed);
+      save(all);
+      msg(`Imported ${addedShots} new shots.`);
+      render();
+    } catch (e) {
+      msg('Import failed unexpectedly after the file was read — please report this.');
+    }
   }).catch(() => msg('Import failed — could not read the file.'));
 }
 function doClear() { if (confirm('Delete all stored range sessions?')) { localStorage.removeItem(LS); render(); } }
