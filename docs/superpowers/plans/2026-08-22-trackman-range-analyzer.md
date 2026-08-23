@@ -1601,7 +1601,10 @@ function computeVerdicts(groups, gaps, checks) {
   });
   gaps.forEach((g, i) => {
     if (!g.gapWarning || g.gapToNext == null) return;
-    if (g.gapToNext < 0) {
+    // -3 yds, not any negative value: below that a "crossed" gap is
+    // rounding/measurement noise (matches the carry-trend verdict's own
+    // 3-yd significance floor above), not a real fitting-implicating flip.
+    if (g.gapToNext < -3) {
       v.push({ tone: 'bad', text: `<b>Crossed clubs:</b> ${esc(g.name)} carries ${r1(Math.abs(g.gapToNext))} yds LESS than ${esc(gaps[i + 1].name)} — check club fitting or whether mishits are dragging this club's number down.` });
       return;
     }
@@ -1696,6 +1699,69 @@ Commit:
 ```bash
 git add range.html test-range-engine.js
 git commit -m "Code-review fix (Task 9): honest verdict fallback + fix crossed-club gap sign"
+```
+
+- [ ] **Step 7: Second-pass fix — gate the crossed-clubs alarm on magnitude**
+
+A second review pass found Step 6's fix reintroduced a smaller-scale version
+of the same problem it closed: `g.gapToNext < 0` fires the alarming "Crossed
+clubs" message for ANY negative value, including statistically negligible
+crossings (e.g. -0.5 yds, well inside measurement/median noise) — a
+rounding-level tie and a genuinely crossed -15 yd bag get identical
+alarm-tone treatment.
+
+Change the condition from `< 0` to `< -3` (reusing the same 3-yd significance
+floor the carry-trend verdict above already uses, rather than inventing a
+third magic number), with a comment explaining why:
+
+```js
+gaps.forEach((g, i) => {
+  if (!g.gapWarning || g.gapToNext == null) return;
+  // -3 yds, not any negative value: below that a "crossed" gap is
+  // rounding/measurement noise (matches the carry-trend verdict's own
+  // 3-yd significance floor above), not a real fitting-implicating flip.
+  if (g.gapToNext < -3) {
+    v.push({ tone: 'bad', text: `<b>Crossed clubs:</b> ${esc(g.name)} carries ${r1(Math.abs(g.gapToNext))} yds LESS than ${esc(gaps[i + 1].name)} — check club fitting or whether mishits are dragging this club's number down.` });
+    return;
+  }
+  const dir = g.gapToNext < 8 ? 'tight' : 'wide';
+  v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(Math.abs(g.gapToNext))} yds apart.` });
+});
+```
+
+Append a regression test:
+
+```js
+// T27. Second code-review fix regression: a near-zero negative gapToNext
+// (rounding/measurement noise, well under the 3-yd significance floor used
+// elsewhere in this function) must NOT trip the alarming "Crossed clubs"
+// wording — it should read as an ordinary "Gap tight" verdict instead, same
+// as a near-zero positive gap would. gapToNext still trips gapWarning here
+// (it's < 8), so the tight/wide branch is reachable; only the sign is inverted.
+const nearZeroCrossedGapSessions = [
+  { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:32,attackAngle:2,ballSpeed:42,spin:5500,carry:100,side:0})) },
+  { date: '2026-08-01', dateAssumed: false, clubCode: '8i', club: canonicalClub('8i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:31,attackAngle:2,ballSpeed:41,spin:5800,carry:100.65,side:0})) },
+];
+const groups27 = groupByClub(nearZeroCrossedGapSessions);
+const gaps27 = computeGapping(groups27);
+chk('T27 sanity: gapToNext is negative but small', gaps27[0].gapToNext < 0 && gaps27[0].gapToNext > -3);
+chk('T27 sanity: gap warning still fires (noise gap is still < 8yd)', gaps27[0].gapWarning === true);
+const v27 = computeVerdicts(groups27, gaps27, []);
+chk('T27 no "Crossed clubs" verdict for noise-level negative gap', !v27.some(v => v.text.includes('Crossed clubs')));
+chk('T27 ordinary "Gap tight" verdict fires instead', v27.some(v => v.text.includes('Gap tight')));
+// T26 unaffected by the new floor: -16 yd is still well past -3, still "Crossed clubs".
+chk('T27 does not affect T26 (strongly-crossed bag)', v26.some(v => v.text.includes('Crossed clubs')));
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`, T26 still fires
+"Crossed clubs" unaffected (its gap is -16 yds, well past the -3 floor).
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Second code-review fix (Task 9): gate crossed-clubs alarm on -3yd floor"
 ```
 
 - [ ] **Step 4: Run to verify all tests pass**
