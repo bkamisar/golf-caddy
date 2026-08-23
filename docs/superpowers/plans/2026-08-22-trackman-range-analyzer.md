@@ -1965,13 +1965,54 @@ function doExport() {
 }
 function doImport(ev) {
   const f = ev.target.files[0]; if (!f) return;
-  f.text().then(t => { const { all, addedShots } = mergeClubSessions(load(), JSON.parse(t)); save(all); msg(`Imported ${addedShots} new shots.`); render(); });
+  f.text().then(t => {
+    let parsed;
+    try {
+      parsed = JSON.parse(t);
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      parsed.forEach(cs => {
+        if (!cs || typeof cs.date !== 'string' || !cs.club || typeof cs.club.name !== 'string' || typeof cs.club.order !== 'number' || !Array.isArray(cs.shots)) {
+          throw new Error('malformed club-session');
+        }
+        if (!cs.shots.every(s => s && typeof s === 'object')) {
+          throw new Error('malformed shot');
+        }
+      });
+    } catch (e) {
+      msg('Import failed — this file doesn\'t look like a valid golf-range export.');
+      return;
+    }
+    try {
+      const { all, addedShots } = mergeClubSessions(load(), parsed);
+      save(all);
+      msg(`Imported ${addedShots} new shots.`);
+      render();
+    } catch (e) {
+      msg('Import failed unexpectedly after the file was read — please report this.');
+    }
+  }).catch(() => msg('Import failed — could not read the file.'));
 }
 function doClear() { if (confirm('Delete all stored range sessions?')) { localStorage.removeItem(LS); render(); } }
 
 populateClubOverride();
 render();
 ```
+
+**Note:** `doImport`'s validation above was added in two post-implementation code-review
+passes, not part of the original Step 2 spec. The original spec's one-line `doImport`
+(`f.text().then(t => { const {...} = mergeClubSessions(load(), JSON.parse(t)); ... })`)
+had no shape validation — malformed JSON failed silently (unhandled promise rejection).
+First pass added try/catch validating `date`/`club.name`/`shots` are the right types. A
+second review found that validation still let a `shots: [null]` array through, which
+would persist to localStorage and then crash `render()` on every future page load
+(recoverable only via "Clear all," wiping ALL stored data) — worse than the original
+silent no-op. Fixed by also validating every shot element is a non-null object and
+`club.order` is a number (both `mergeClubSessions`/`computeGapping` sort on `club.order`,
+which degrades to a silently-scrambled gapping table if missing), plus giving
+post-validation failures (defense in depth) a message distinct from file-read failures.
+Verified live in a browser: the adversarial `shots:[null]` input is now rejected before
+anything is saved, a missing-`order` club is rejected, and a well-formed import (matching
+`canonicalClub`'s real `{code,name,order,klass}` shape) still succeeds normally.
 
 - [ ] **Step 3: Run the engine test suite to confirm nothing broke**
 
