@@ -115,3 +115,17 @@ used only as a same-paste self-check). A generic keyword-mapped CSV/table
 adapter is the fallback for any other launch monitor — bring a real export from
 one and a named adapter is a few lines in the `SOURCES` registry, same pattern
 as the round analyzer's Grint/generic split.
+
+## Course view (phone)
+
+`course.html` is a third page: a read-only, mobile-first reference for when you're
+actually on the course. It shows your top few reminders and the whole bag as a
+yardage ladder — carry, typical miss direction, and mishit rate per club — and
+nothing else. No paste form, no editing.
+
+It reads the same browser storage as `range.html`, so on the same device it just
+works. To get data from the computer you paste on to the phone you carry: hit
+**Export JSON** in `range.html`, move that file to your phone however you like
+(AirDrop, email, a cloud-drive folder), then tap **Refresh data (import)** on
+`course.html`. Importing merges rather than replaces, so re-importing after a new
+range session is safe.
