@@ -79,3 +79,39 @@ adapter (like Grint's) is a few lines in the `SOURCES` registry.
 - The **Ceiling signal** verdict now states your *recipe*: the average putts (and GIR)
   in your career-best-decile rounds vs a normal day, so "what a good round looks like"
   is a concrete number, not a platitude.
+
+## Range analyzer (Trackman)
+
+A second tool, `range.html`, alongside the round analyzer above — same local-only,
+no-account philosophy, different data: shot-level launch monitor sessions instead
+of round scores. The two never mix; round data carries no Trackman fields and
+vice versa.
+
+1. At the range, on the Trackman screen: select one club → select the whole
+   per-club table (header row through the Consistency row) → copy.
+2. Open `range.html` → optionally set ball/venue/temp tags for the visit →
+   paste → **Parse & save**. One paste = one club on one date; do this once per
+   club you hit. Re-pasting is safe — duplicate shots merge.
+3. Read the verdicts and gapping table; **Copy prompt** to debrief with the same
+   four coaches, grounded in your clean-shot yardages.
+
+**Why clean-shot median, not Trackman's on-screen average:** the average
+includes duffs. A shot is quarantined as a mishit if its smash factor is below
+a club-class floor (bad strike) or its spin AND carry are both far below the
+session's own reference (a thin flier) — spin alone isn't enough, since your
+longest shots are often your lowest-spin ones too. Quarantined shots are shown,
+never silently dropped.
+
+**Why trend compares 2 sessions vs the previous 3, not 5 vs 10 like the round
+analyzer:** range visits are far sparser than rounds. Carry, ball speed, spin,
+and smash factor get a caveat when session ball/venue/temp tags differ or are
+missing, since range balls and weather move carry independent of your swing;
+club speed, attack angle, dispersion, and mishit rate compare freely, since
+those aren't ball- or weather-dependent.
+
+The `trackman` adapter is deliberately specific to Trackman's paste shape
+(icon-noise lines, the two-line club header, the Average/Consistency footer
+used only as a same-paste self-check). A generic keyword-mapped CSV/table
+adapter is the fallback for any other launch monitor — bring a real export from
+one and a named adapter is a few lines in the `SOURCES` registry, same pattern
+as the round analyzer's Grint/generic split.
