@@ -19,6 +19,18 @@ chk('T2 unknown code degrades gracefully', canonicalClub('Zzz9').name === 'Zzz9'
 chk('T2 driver sorts before 7-iron', canonicalClub('Dr').order < canonicalClub('7i').order);
 chk('T2 7-iron sorts before PW', canonicalClub('7i').order < canonicalClub('PW').order);
 
+// T32. Bug report: 6-Hybrid (and 7-Hybrid) fell through to 'unknown'/order 999
+// and sorted to the bottom of the gapping table instead of with the other
+// hybrids. CLUB_TABLE jumped straight from 5-Hybrid to 2-Iron with no 6h/7h
+// entry — same gap pattern already flagged for woods (5w->7w skips 6w).
+chk('T32 6h recognized as 6-Hybrid, hybrid class', canonicalClub('6h').name === '6-Hybrid' && canonicalClub('6h').klass === 'hybrid');
+chk('T32 h6 (alt notation) also recognized', canonicalClub('h6').name === '6-Hybrid' && canonicalClub('h6').klass === 'hybrid');
+chk('T32 7h recognized as 7-Hybrid, hybrid class', canonicalClub('7h').name === '7-Hybrid' && canonicalClub('7h').klass === 'hybrid');
+chk('T32 6-Hybrid sorts with the other hybrids, not at the bottom', canonicalClub('6h').order > canonicalClub('5h').order && canonicalClub('6h').order < canonicalClub('2i').order);
+chk('T32 7-Hybrid sorts before irons', canonicalClub('7h').order < canonicalClub('2i').order);
+// "6 Hybrid" from a generic CSV import must resolve the same way (normalizeClubCode -> canonicalClub)
+chk('T32 spelled-out "6 Hybrid" from generic CSV also resolves correctly', canonicalClub(normalizeClubCode('6 Hybrid')).name === '6-Hybrid');
+
 // T3. Header/unit/date/club detection building blocks
 const SAMPLE_7I = `2026-08-22
 7i
