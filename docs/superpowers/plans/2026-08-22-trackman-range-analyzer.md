@@ -1695,7 +1695,7 @@ Run: `node test-range-engine.js` — expect `ALL PASS`, T21-T24 unaffected.
 Commit:
 ```bash
 git add range.html test-range-engine.js
-git commit -m "Code-review fixes for Task 9: honest steady-state fallback, crossed-club gap wording"
+git commit -m "Code-review fix (Task 9): honest verdict fallback + fix crossed-club gap sign"
 ```
 
 - [ ] **Step 4: Run to verify all tests pass**
