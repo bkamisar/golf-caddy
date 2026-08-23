@@ -44,20 +44,34 @@ chk('C3 carries rounded carry value', lad[0].carry === 240 && lad[1].carry === 1
 chk('C3 empty input returns empty array, no divide-by-zero', ladderRows([]).length === 0);
 chk('C3 all-null input returns empty array', ladderRows([{name:'X',cleanCarryYd:null}]).length === 0);
 
-// C4. Parity check for the same fix applied to range.html: computeGapping
-// re-derives order/klass from CLUB_TABLE by name rather than trusting a
-// stale order baked into an already-stored session's club object.
+// C4. Parity check for the same fix applied to range.html: a session's full
+// identity (name, not just order/klass) is re-derived fresh from its raw
+// clubCode via healSession/healClubSessions, since a code that once fell
+// through to 'unknown' was stored with its NAME equal to the raw code itself
+// ("6h"), not just a stale order number.
 const staleHybridSession = {
   date: '2026-08-01', dateAssumed: false, clubCode: '6h',
-  club: { code: '6h', name: '6-Hybrid', order: 999, klass: 'unknown' },
+  club: { code: '6h', name: '6h', order: 999, klass: 'unknown' }, // exactly what canonicalClub('6h') used to return
   tags: {},
   shots: Array.from({ length: 6 }, () => ({ clubSpeed: 32, attackAngle: 2, ballSpeed: 42, spin: 5500, carry: 116, side: 5 })),
 };
 const staleIronSession = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
   shots: Array.from({ length: 6 }, () => ({ clubSpeed: 30, attackAngle: 0, ballSpeed: 40, spin: 6000, carry: 110, side: -3 })) };
+
+chk('C4 healSession fixes a stale name, not just a stale order/klass', (() => {
+  const h = healSession(staleHybridSession);
+  return h.club.name === '6-Hybrid' && h.club.order === canonicalClub('6h').order && h.club.klass === 'hybrid';
+})());
+
 const gapsC4 = computeGapping(groupByClub([staleHybridSession, staleIronSession]));
+chk('C4 groupByClub buckets the stale-named session under its healed name (no phantom "6h" row)', gapsC4.every(g => g.name !== '6h') && gapsC4.some(g => g.name === '6-Hybrid'));
 const hybC4 = gapsC4.find(g => g.name === '6-Hybrid');
 chk('C4 6-Hybrid heals to the current CLUB_TABLE order despite a stale stored order', hybC4.order === canonicalClub('6h').order);
-chk('C4 6-Hybrid sorts before 7-Iron even with stale stored order:999', gapsC4.findIndex(g => g.name === '6-Hybrid') < gapsC4.findIndex(g => g.name === '7-Iron'));
+chk('C4 6-Hybrid sorts before 7-Iron even with a stale stored name+order', gapsC4.findIndex(g => g.name === '6-Hybrid') < gapsC4.findIndex(g => g.name === '7-Iron'));
+
+// New CLUB_TABLE entries added alongside this fix.
+chk('C4 1-Iron and 1-Hybrid recognized', canonicalClub('1i').name === '1-Iron' && canonicalClub('1h').name === '1-Hybrid');
+chk('C4 6-Wood, 8-Wood, 9-Wood recognized', canonicalClub('6w').name === '6-Wood' && canonicalClub('8w').name === '8-Wood' && canonicalClub('9w').name === '9-Wood');
+chk('C4 8-Hybrid, 9-Hybrid recognized', canonicalClub('8h').name === '8-Hybrid' && canonicalClub('9h').name === '9-Hybrid');
 
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

@@ -165,31 +165,45 @@ var r1 = v => v === null || v === undefined || isNaN(v) ? null : Math.round(v * 
 
 // ── Club table: canonical name, bag order (driver→wedges), club class for
 // smash-factor floors. Regexes match Trackman's short codes case-insensitively.
+// Covers the full standard numeric run (woods 2-9, hybrids 1-9, irons 1-9) plus
+// all four named wedges, rather than only the clubs a real bag has been seen
+// to contain — a code that isn't here yet falls through to 'unknown'/order:999
+// (see canonicalClub below), which is exactly the bug 6-/7-Hybrid hit before
+// they were added. Order values are never persisted-and-trusted (see
+// healSession/healClubSessions below), so this table can always be safely
+// extended or renumbered later without corrupting already-stored data.
 const CLUB_TABLE = [
   { re:/^(dr|driver|1w)$/i, name:'Driver',   order:0,  klass:'driver' },
   { re:/^(2w)$/i,           name:'2-Wood',   order:1,  klass:'wood' },
   { re:/^(3w)$/i,           name:'3-Wood',   order:2,  klass:'wood' },
   { re:/^(4w)$/i,           name:'4-Wood',   order:3,  klass:'wood' },
   { re:/^(5w)$/i,           name:'5-Wood',   order:4,  klass:'wood' },
-  { re:/^(7w)$/i,           name:'7-Wood',   order:5,  klass:'wood' },
-  { re:/^(2h|h2)$/i,        name:'2-Hybrid', order:6,  klass:'hybrid' },
-  { re:/^(3h|h3)$/i,        name:'3-Hybrid', order:7,  klass:'hybrid' },
-  { re:/^(4h|h4)$/i,        name:'4-Hybrid', order:8,  klass:'hybrid' },
-  { re:/^(5h|h5)$/i,        name:'5-Hybrid', order:9,  klass:'hybrid' },
-  { re:/^(6h|h6)$/i,        name:'6-Hybrid', order:10, klass:'hybrid' },
-  { re:/^(7h|h7)$/i,        name:'7-Hybrid', order:11, klass:'hybrid' },
-  { re:/^(2i)$/i,           name:'2-Iron',   order:12, klass:'iron' },
-  { re:/^(3i)$/i,           name:'3-Iron',   order:13, klass:'iron' },
-  { re:/^(4i)$/i,           name:'4-Iron',   order:14, klass:'iron' },
-  { re:/^(5i)$/i,           name:'5-Iron',   order:15, klass:'iron' },
-  { re:/^(6i)$/i,           name:'6-Iron',   order:16, klass:'iron' },
-  { re:/^(7i)$/i,           name:'7-Iron',   order:17, klass:'iron' },
-  { re:/^(8i)$/i,           name:'8-Iron',   order:18, klass:'iron' },
-  { re:/^(9i)$/i,           name:'9-Iron',   order:19, klass:'iron' },
-  { re:/^(pw)$/i,           name:'PW',       order:20, klass:'wedge' },
-  { re:/^(gw|aw)$/i,        name:'GW',       order:21, klass:'wedge' },
-  { re:/^(sw)$/i,           name:'SW',       order:22, klass:'wedge' },
-  { re:/^(lw)$/i,           name:'LW',       order:23, klass:'wedge' },
+  { re:/^(6w)$/i,           name:'6-Wood',   order:5,  klass:'wood' },
+  { re:/^(7w)$/i,           name:'7-Wood',   order:6,  klass:'wood' },
+  { re:/^(8w)$/i,           name:'8-Wood',   order:7,  klass:'wood' },
+  { re:/^(9w)$/i,           name:'9-Wood',   order:8,  klass:'wood' },
+  { re:/^(1h|h1)$/i,        name:'1-Hybrid', order:9,  klass:'hybrid' },
+  { re:/^(2h|h2)$/i,        name:'2-Hybrid', order:10, klass:'hybrid' },
+  { re:/^(3h|h3)$/i,        name:'3-Hybrid', order:11, klass:'hybrid' },
+  { re:/^(4h|h4)$/i,        name:'4-Hybrid', order:12, klass:'hybrid' },
+  { re:/^(5h|h5)$/i,        name:'5-Hybrid', order:13, klass:'hybrid' },
+  { re:/^(6h|h6)$/i,        name:'6-Hybrid', order:14, klass:'hybrid' },
+  { re:/^(7h|h7)$/i,        name:'7-Hybrid', order:15, klass:'hybrid' },
+  { re:/^(8h|h8)$/i,        name:'8-Hybrid', order:16, klass:'hybrid' },
+  { re:/^(9h|h9)$/i,        name:'9-Hybrid', order:17, klass:'hybrid' },
+  { re:/^(1i)$/i,           name:'1-Iron',   order:18, klass:'iron' },
+  { re:/^(2i)$/i,           name:'2-Iron',   order:19, klass:'iron' },
+  { re:/^(3i)$/i,           name:'3-Iron',   order:20, klass:'iron' },
+  { re:/^(4i)$/i,           name:'4-Iron',   order:21, klass:'iron' },
+  { re:/^(5i)$/i,           name:'5-Iron',   order:22, klass:'iron' },
+  { re:/^(6i)$/i,           name:'6-Iron',   order:23, klass:'iron' },
+  { re:/^(7i)$/i,           name:'7-Iron',   order:24, klass:'iron' },
+  { re:/^(8i)$/i,           name:'8-Iron',   order:25, klass:'iron' },
+  { re:/^(9i)$/i,           name:'9-Iron',   order:26, klass:'iron' },
+  { re:/^(pw)$/i,           name:'PW',       order:27, klass:'wedge' },
+  { re:/^(gw|aw)$/i,        name:'GW',       order:28, klass:'wedge' },
+  { re:/^(sw)$/i,           name:'SW',       order:29, klass:'wedge' },
+  { re:/^(lw)$/i,           name:'LW',       order:30, klass:'wedge' },
 ];
 function canonicalClub(code) {
   const c = (code || '').trim();
@@ -199,6 +213,24 @@ function canonicalClub(code) {
 function clubByName(name) {
   const row = CLUB_TABLE.find(c => c.name === name);
   return row ? { code: name, name: row.name, order: row.order, klass: row.klass } : null;
+}
+// A session's canonical club identity (name/order/klass) is re-derived fresh
+// from its raw, immutable clubCode every time it's read, rather than trusted
+// from whatever was computed and stored at parse time. CLUB_TABLE can gain
+// entries later (as it just did for 6-/7-Hybrid, and again here for the rest
+// of the numeric run) — without this, any session saved before such a change
+// keeps its *old* identity forever, including a wrong NAME (a code that once
+// fell through to 'unknown' was stored with name equal to the raw code
+// itself, e.g. "6h" instead of "6-Hybrid"), which silently fragments that
+// club into a separate, permanently-mis-sorted row instead of just having a
+// wrong order number. normalizeClubCode handles the generic-adapter's
+// spelled-out forms ("6 Hybrid") and is a no-op on already-short codes, so
+// it's safe to apply unconditionally here.
+function healSession(cs) {
+  return { ...cs, club: canonicalClub(normalizeClubCode(cs.clubCode)) };
+}
+function healClubSessions(clubSessions) {
+  return (clubSessions || []).map(healSession);
 }
 
 // Escape any string that came from a paste before it touches innerHTML.
@@ -513,7 +545,11 @@ function shotKey(s) {
     .map(k => typeof s[k] === 'number' && !isNaN(s[k]) ? s[k].toFixed(1) : '').join('|');
 }
 function mergeClubSessions(existing, incoming) {
-  const key = cs => `${cs.date}|${cs.club.name}`;
+  // Keyed off a fresh canonicalClub(clubCode) lookup, not cs.club.name — a
+  // stale stored name (see healSession above) would otherwise merge/dedup
+  // against the wrong bucket, or split one real club into two rows, whenever
+  // either side wasn't already healed before being passed in here.
+  const key = cs => `${cs.date}|${canonicalClub(normalizeClubCode(cs.clubCode)).name}`;
   const map = {};
   existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } }; });
   let addedShots = 0;
@@ -604,7 +640,7 @@ function quarantineClub(sessions) {
 // re-grouping/re-quarantining independently.
 function groupByClub(clubSessions) {
   const byClub = {};
-  clubSessions.forEach(cs => { (byClub[cs.club.name] = byClub[cs.club.name] || []).push(cs); });
+  healClubSessions(clubSessions).forEach(cs => { (byClub[cs.club.name] = byClub[cs.club.name] || []).push(cs); });
   return Object.keys(byClub).map(name => ({
     name,
     sessions: quarantineClub(byClub[name].slice().sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0))),
@@ -835,7 +871,11 @@ Debrief my ball-striking as a conversation between the four of you: what's real 
 
 // ── UI ───────────────────────────────────────────────────────────────────────
 const LS = 'golfcaddy_range';
-const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
+// healClubSessions here (not just inside groupByClub) so doDeleteSession's
+// direct-array filter below also compares against a freshly-derived club
+// name, not whatever was stored — otherwise a delete on a healed-in-the-UI
+// but still-stale-on-disk row would silently match nothing.
+const load = () => { try { return healClubSessions(JSON.parse(localStorage.getItem(LS)) || []); } catch (e) { return []; } };
 const save = cs => localStorage.setItem(LS, JSON.stringify(cs));
 
 // Rebuilt every render(); doDeleteSession(i) looks up the real date/club by

@@ -611,27 +611,56 @@ chk('T34 no leftover HTML tags', !/<\/?b>/.test(prompt34));
 const prompt34b = coachPrompt(computeGapping(groups14), computeVerdicts(groups14, computeGapping(groups14), []), groups14);
 chk('T34 club with only 1 session gets the "not enough history" line, not a trend', prompt34b.includes('(not enough session history yet for a trend line)') && !prompt34b.includes('Trend (last 2 sessions'));
 
-// T35. Bug report: 6-Hybrid showing out of order in the clubs display.
-// Root cause: computeGapping read order/klass off each session's STORED club
-// object, not a fresh CLUB_TABLE lookup by name. When 6-Hybrid/7-Hybrid were
-// added, every order value after them shifted — so any club-session saved
-// before that renumbering still carries its old, now-wrong order number
-// baked into localStorage, permanently mis-sorting the ladder until the user
-// re-pastes. Fix: re-derive order/klass from the current CLUB_TABLE by name
-// at render time, so already-stored data self-heals instead of needing a
-// manual re-paste every time CLUB_TABLE's numbering changes.
+// T35. Bug report: 6-Hybrid showing out of order in the clubs display. The
+// deeper root cause wasn't just a stale order NUMBER (fixed in a first pass)
+// — it was that a session saved before 6-Hybrid existed in CLUB_TABLE was
+// stored with its NAME wrong too: canonicalClub('6h') used to fall through
+// to the 'unknown' branch, which names the club after the raw code itself
+// ("6h"), not "6-Hybrid". That fragments the club into a separate,
+// permanently-mis-sorted row rather than just sorting the right row wrong.
+// Fix: healSession/healClubSessions re-derive the full identity (name AND
+// order AND klass) from the immutable clubCode on every read, and every
+// consumer (groupByClub, load(), mergeClubSessions' dedup key) goes through
+// that instead of trusting whatever was computed and stored at parse time.
 const staleHybridSession = {
   date: '2026-08-01', dateAssumed: false, clubCode: '6h',
-  club: { code: '6h', name: '6-Hybrid', order: 999, klass: 'unknown' }, // stale pre-renumber order baked in
+  club: { code: '6h', name: '6h', order: 999, klass: 'unknown' }, // exactly what canonicalClub('6h') used to return
   tags: {},
   shots: Array.from({ length: 6 }, () => ({ clubSpeed: 32, attackAngle: 2, ballSpeed: 42, spin: 5500, carry: 116, side: 5 })),
 };
 const staleIronSession = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
   shots: Array.from({ length: 6 }, () => ({ clubSpeed: 30, attackAngle: 0, ballSpeed: 40, spin: 6000, carry: 110, side: -3 })) };
+
+chk('T35 healSession fixes a stale name, not just a stale order/klass', (() => {
+  const h = healSession(staleHybridSession);
+  return h.club.name === '6-Hybrid' && h.club.order === canonicalClub('6h').order && h.club.klass === 'hybrid';
+})());
+chk('T35 healClubSessions maps every session, preserves shots untouched', (() => {
+  const healed = healClubSessions([staleHybridSession]);
+  return healed.length === 1 && healed[0].shots === staleHybridSession.shots;
+})());
+chk('T35 healClubSessions on empty/undefined input returns empty array', healClubSessions([]).length === 0 && healClubSessions(undefined).length === 0);
+
 const gaps35 = computeGapping(groupByClub([staleHybridSession, staleIronSession]));
+chk('T35 groupByClub buckets the stale-named session under its healed name (no phantom "6h" row)', gaps35.every(g => g.name !== '6h') && gaps35.some(g => g.name === '6-Hybrid'));
 const hyb35 = gaps35.find(g => g.name === '6-Hybrid');
 chk('T35 6-Hybrid heals to the current CLUB_TABLE order despite a stale stored order', hyb35.order === canonicalClub('6h').order);
-chk('T35 6-Hybrid sorts before 7-Iron even with stale stored order:999', gaps35.findIndex(g => g.name === '6-Hybrid') < gaps35.findIndex(g => g.name === '7-Iron'));
+chk('T35 6-Hybrid sorts before 7-Iron even with a stale stored name+order', gaps35.findIndex(g => g.name === '6-Hybrid') < gaps35.findIndex(g => g.name === '7-Iron'));
+
+// A re-paste of the SAME club under a NOW-correct name must merge into the
+// stale-named session's row, not sit alongside it as a second "6-Hybrid".
+const freshHybridSameDate = { date: '2026-08-01', dateAssumed: false, clubCode: '6h', club: canonicalClub('6h'), tags: {},
+  shots: Array.from({ length: 3 }, () => ({ clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400, carry: 118, side: 4 })) };
+const merged35 = mergeClubSessions([staleHybridSession], [freshHybridSameDate]);
+chk('T35 merge keys a stale-named existing session against a fresh-named incoming one as the SAME club-session (not split into two rows)', merged35.all.length === 1);
+
+// New CLUB_TABLE entries added alongside this fix — every gap in the
+// numeric run (woods 2-9, hybrids 1-9, irons 1-9) is now covered.
+chk('T35 1-Iron recognized, sorts before 2-Iron', canonicalClub('1i').name === '1-Iron' && canonicalClub('1i').klass === 'iron' && canonicalClub('1i').order < canonicalClub('2i').order);
+chk('T35 6-Wood recognized, sorts between 5-Wood and 7-Wood', canonicalClub('6w').name === '6-Wood' && canonicalClub('6w').order > canonicalClub('5w').order && canonicalClub('6w').order < canonicalClub('7w').order);
+chk('T35 8-Wood and 9-Wood recognized, sort before hybrids', canonicalClub('8w').name === '8-Wood' && canonicalClub('9w').name === '9-Wood' && canonicalClub('9w').order < canonicalClub('1h').order);
+chk('T35 1-Hybrid recognized, sorts before 2-Hybrid', canonicalClub('1h').name === '1-Hybrid' && canonicalClub('1h').klass === 'hybrid' && canonicalClub('1h').order < canonicalClub('2h').order);
+chk('T35 8-Hybrid and 9-Hybrid recognized, sort before irons', canonicalClub('8h').name === '8-Hybrid' && canonicalClub('9h').name === '9-Hybrid' && canonicalClub('9h').order < canonicalClub('1i').order);
 chk('T35 klass also heals from "unknown" to "hybrid"', hyb35.klass === 'hybrid');
 
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
