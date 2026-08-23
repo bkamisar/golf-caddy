@@ -428,8 +428,20 @@ function shotKey(s) {
   // unit change — a real but likely rare scenario. The tested, common case
   // (re-pasting identical text) is unaffected: identical input always produces
   // identical floats regardless of rounding precision.
+  // Guard with typeof (not just `== null`): this is the 4th code-review round
+  // to find a "malformed data persists then crashes on next access" bug at
+  // this data boundary (doImport validation has been patched three times,
+  // each time chasing the next field one level deeper). shotKey is the
+  // actual shared chokepoint every caller funnels through (mergeClubSessions,
+  // called by both doParse's normal paste-and-save and doImport), so
+  // hardening it here — rather than doImport's validation alone — protects
+  // every current and future caller permanently. A non-numeric/garbage field
+  // (e.g. a corrupted shot with {carry: "150"} that was persisted via some
+  // other path) degrades safely to '' in the fingerprint instead of throwing
+  // `s[k].toFixed is not a function`; worst case is a dedup-key collision
+  // between two garbage values, which is far better than crashing the app.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
-    .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
+    .map(k => typeof s[k] === 'number' && !isNaN(s[k]) ? s[k].toFixed(1) : '').join('|');
 }
 function mergeClubSessions(existing, incoming) {
   const key = cs => `${cs.date}|${cs.club.name}`;
