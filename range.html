@@ -611,9 +611,11 @@ function computeTrend(sessions) {
 // ── Verdicts ───────────────────────────────────────────────────────────────────
 function computeVerdicts(groups, gaps, checks) {
   const v = [];
+  let anyEnoughData = false;
   groups.forEach(g => {
     const t = computeTrend(g.sessions);
     if (!t.enough) return;
+    anyEnoughData = true;
     if (t.carry.recent != null && t.carry.baseline != null) {
       const carryD = (t.carry.recent - t.carry.baseline) * M_TO_YD;
       if (Math.abs(carryD) >= 3) {
@@ -636,8 +638,12 @@ function computeVerdicts(groups, gaps, checks) {
   });
   gaps.forEach((g, i) => {
     if (!g.gapWarning || g.gapToNext == null) return;
+    if (g.gapToNext < 0) {
+      v.push({ tone: 'bad', text: `<b>Crossed clubs:</b> ${esc(g.name)} carries ${r1(Math.abs(g.gapToNext))} yds LESS than ${esc(gaps[i + 1].name)} — check club fitting or whether mishits are dragging this club's number down.` });
+      return;
+    }
     const dir = g.gapToNext < 8 ? 'tight' : 'wide';
-    v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(g.gapToNext)} yds apart.` });
+    v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(Math.abs(g.gapToNext))} yds apart.` });
   });
   (checks || []).filter(c => c && !c.ok).forEach(c => {
     v.push({ tone: 'flat',
@@ -646,7 +652,11 @@ function computeVerdicts(groups, gaps, checks) {
   gaps.filter(g => g.lowConfidence).forEach(g => {
     v.push({ tone: 'flat', text: `<b>Low confidence:</b> ${esc(g.name)} has only ${g.n} clean shot(s) recorded — gapping number is provisional.` });
   });
-  if (!v.length) v.push({ tone: 'flat', text: 'Not enough data yet for trend verdicts — keep pasting sessions.' });
+  if (!v.length) {
+    v.push({ tone: 'flat', text: anyEnoughData
+      ? 'No notable changes recently — carry, mishit rate, and side bias are all steady versus your baseline.'
+      : 'Not enough data yet for trend verdicts — keep pasting sessions.' });
+  }
   return v;
 }
 /*ENGINE-END*/

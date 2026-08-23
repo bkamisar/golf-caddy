@@ -400,4 +400,49 @@ chk('T23 data note verdict present', v23.some(v => v.text.includes('Data note') 
 const v24 = computeVerdicts([], [], []);
 chk('T24 fallback verdict when nothing computable', v24.length === 1 && v24[0].text.includes('Not enough data'));
 
+// T25. Code-review fix regression: 5 real sessions of trend-eligible data (enough:
+// true) where carry is rock-stable, nobody mishits, and side bias is negligible —
+// i.e. there IS plenty of data, it's just unremarkable. The old fallback wording
+// ("Not enough data yet") would be actively misleading here; it must say
+// something positive/steady instead. Single club group also means computeGapping
+// can't produce a gap warning, so the only path left to the fallback is the
+// "nothing crossed a threshold" one.
+const hist25 = [
+  fakeSession('2026-07-01', [115, 115, 115, 115, 115]),
+  fakeSession('2026-07-08', [115, 115, 115, 115, 115]),
+  fakeSession('2026-07-15', [115, 115, 115, 115, 115]),
+  fakeSession('2026-08-01', [115, 115, 115, 115, 115]),
+  fakeSession('2026-08-08', [115, 115, 115, 115, 115]),
+];
+const groups25 = groupByClub(hist25);
+const gaps25 = computeGapping(groups25);
+chk('T25 sanity: trend data is actually enough', computeTrend(groups25[0].sessions).enough === true);
+chk('T25 sanity: no gap warning (single club)', !gaps25.some(g => g.gapWarning));
+const v25 = computeVerdicts(groups25, gaps25, []);
+chk('T25 exactly one fallback verdict', v25.length === 1);
+chk('T25 fallback is positive/steady, not "not enough data"', !v25[0].text.includes('Not enough data') && /steady|no notable/i.test(v25[0].text));
+
+// T26. Code-review fix regression: a lower-ordered club (7-Iron) carrying LESS
+// than the next club down (8-Iron) by more than the 8yd gapWarning threshold —
+// a crossed/inverted bag, not a merely "tight" gap. gapToNext is negative in
+// this case; the old code labeled it "Gap tight" with a negative, nonsensical
+// yardage. Must fire a distinct "Crossed clubs" verdict with a positive number.
+const crossedGapSessions = [
+  { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:32,attackAngle:2,ballSpeed:42,spin:5500,carry:95,side:0})) },
+  { date: '2026-08-01', dateAssumed: false, clubCode: '8i', club: canonicalClub('8i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:31,attackAngle:2,ballSpeed:41,spin:5800,carry:110,side:0})) },
+];
+const groups26 = groupByClub(crossedGapSessions);
+const gaps26 = computeGapping(groups26);
+chk('T26 sanity: gapToNext is negative (7-Iron carries less than 8-Iron)', gaps26[0].gapToNext < 0);
+chk('T26 sanity: gap warning fires', gaps26[0].gapWarning === true);
+const v26 = computeVerdicts(groups26, gaps26, []);
+chk('T26 crossed-clubs verdict present', v26.some(v => v.text.includes('Crossed clubs')));
+chk('T26 no "Gap tight"/"Gap wide" verdict for the crossed pair', !v26.some(v => v.text.includes('Gap tight') || v.text.includes('Gap wide')));
+chk('T26 displayed yardage is positive', v26.some(v => v.text.includes('Crossed clubs') && (() => {
+  const m = v.text.match(/carries ([\d.]+) yds LESS/);
+  return m && parseFloat(m[1]) > 0;
+})()));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
