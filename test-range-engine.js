@@ -467,4 +467,15 @@ chk('T27 ordinary "Gap tight" verdict fires instead', v27.some(v => v.text.inclu
 // T26 unaffected by the new floor: -16 yd is still well past -3, still "Crossed clubs".
 chk('T27 does not affect T26 (strongly-crossed bag)', v26.some(v => v.text.includes('Crossed clubs')));
 
+// T25. Coach prompt includes gapping numbers and verdict text, strips HTML tags
+// NOTE: variable named v25b (not v25) — `const v25` is already declared above
+// for Task 9's fix-round regression test, which also carries the "T25" label;
+// reusing `v25` here would be a real SyntaxError (duplicate const), not just a
+// cosmetic label clash, so this test's local variables are suffixed "b".
+const v25b = computeVerdicts(groups21, gaps21, []);
+const prompt25 = coachPrompt(gaps21, v25b);
+chk('T25 prompt mentions all four coaches', ['FALDO','BRYSON','FAXON','PHIL'].every(name => prompt25.includes(name)));
+chk('T25 prompt includes club yardage', prompt25.includes('7-Iron'));
+chk('T25 prompt has no leftover HTML tags', !/<\/?b>/.test(prompt25));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

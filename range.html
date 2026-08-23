@@ -662,6 +662,27 @@ function computeVerdicts(groups, gaps, checks) {
   }
   return v;
 }
+
+// ── Coach debrief prompt ──────────────────────────────────────────────────────
+function coachPrompt(gaps, verdicts) {
+  const rows = gaps.filter(g => g.cleanCarryYd != null).map(g =>
+    `${g.name}: ${r1(g.cleanCarryYd)} yds median (n=${g.n}, mishit rate ${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : 'n/a'}` +
+    `${g.sideBiasYd != null ? `, bias ${r1(Math.abs(g.sideBiasYd))} ${g.sideBiasYd > 0 ? 'R' : 'L'}` : ''})`
+  ).join('\n');
+  return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my range data below — no generic tips.
+- FALDO (swing mechanics): tempo, fundamentals, repeatability.
+- BRYSON (data): ruthlessly quantitative, calls out what the numbers do and don't support.
+- FAXON (putting): stroke, green reading, speed.
+- PHIL (short game): chipping, pitching, scrambling — and gambler's course management.
+
+MY RANGE DATA (Trackman, clean-shot medians after mishit quarantine):
+${rows || '(no clean-shot data yet)'}
+
+RECENT SIGNALS:
+${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n')}
+
+Debrief my ball-striking as a conversation between the four of you: what's real in the recent trend, what's noise, where you disagree, and end with ONE range priority each (a specific drill with success criteria), then a consensus pick for the single most valuable thing to work on next session.`;
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
