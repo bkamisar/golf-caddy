@@ -1574,9 +1574,11 @@ Insert after `computeTrend`, before `/*ENGINE-END*/`:
 // ── Verdicts ───────────────────────────────────────────────────────────────────
 function computeVerdicts(groups, gaps, checks) {
   const v = [];
+  let anyEnoughData = false;
   groups.forEach(g => {
     const t = computeTrend(g.sessions);
     if (!t.enough) return;
+    anyEnoughData = true;
     if (t.carry.recent != null && t.carry.baseline != null) {
       const carryD = (t.carry.recent - t.carry.baseline) * M_TO_YD;
       if (Math.abs(carryD) >= 3) {
@@ -1599,8 +1601,12 @@ function computeVerdicts(groups, gaps, checks) {
   });
   gaps.forEach((g, i) => {
     if (!g.gapWarning || g.gapToNext == null) return;
+    if (g.gapToNext < 0) {
+      v.push({ tone: 'bad', text: `<b>Crossed clubs:</b> ${esc(g.name)} carries ${r1(Math.abs(g.gapToNext))} yds LESS than ${esc(gaps[i + 1].name)} — check club fitting or whether mishits are dragging this club's number down.` });
+      return;
+    }
     const dir = g.gapToNext < 8 ? 'tight' : 'wide';
-    v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(g.gapToNext)} yds apart.` });
+    v.push({ tone: 'warn', text: `<b>Gap ${dir}:</b> ${esc(g.name)} → ${esc(gaps[i + 1].name)} is ${r1(Math.abs(g.gapToNext))} yds apart.` });
   });
   (checks || []).filter(c => c && !c.ok).forEach(c => {
     v.push({ tone: 'flat',
@@ -1609,9 +1615,87 @@ function computeVerdicts(groups, gaps, checks) {
   gaps.filter(g => g.lowConfidence).forEach(g => {
     v.push({ tone: 'flat', text: `<b>Low confidence:</b> ${esc(g.name)} has only ${g.n} clean shot(s) recorded — gapping number is provisional.` });
   });
-  if (!v.length) v.push({ tone: 'flat', text: 'Not enough data yet for trend verdicts — keep pasting sessions.' });
+  if (!v.length) {
+    v.push({ tone: 'flat', text: anyEnoughData
+      ? 'No notable changes recently — carry, mishit rate, and side bias are all steady versus your baseline.'
+      : 'Not enough data yet for trend verdicts — keep pasting sessions.' });
+  }
   return v;
 }
+```
+
+- [ ] **Step 6: Fixes from code review — misleading fallback + crossed-club gaps**
+
+Code review found two user-facing text bugs, both baked into the Step 3 code
+above (already corrected there, called out explicitly here since they were
+found after initial implementation):
+
+1. **Misleading "Not enough data" fallback.** With plenty of clean shots and
+   stable numbers (nothing crosses a threshold), the old fallback said "Not
+   enough data yet" — actively wrong when data is fine and just unremarkable.
+   Fixed by tracking `anyEnoughData` (set when any group's `computeTrend`
+   returns `enough: true`) and branching the fallback message.
+2. **Negative-yardage "tight gap" for crossed clubs.** A club carrying LESS
+   than the next club down (a real, more serious problem) produced a negative
+   `gapToNext`, silently labeled "Gap tight" with a nonsensical negative
+   number. Fixed with a distinct `gapToNext < 0` branch ("Crossed clubs") and
+   `Math.abs()` on all displayed gap yardages.
+
+Append regression tests:
+
+```js
+// T25. Code-review fix regression: 5 real sessions of trend-eligible data (enough:
+// true) where carry is rock-stable, nobody mishits, and side bias is negligible —
+// i.e. there IS plenty of data, it's just unremarkable. The old fallback wording
+// ("Not enough data yet") would be actively misleading here; it must say
+// something positive/steady instead. Single club group also means computeGapping
+// can't produce a gap warning, so the only path left to the fallback is the
+// "nothing crossed a threshold" one.
+const hist25 = [
+  fakeSession('2026-07-01', [115, 115, 115, 115, 115]),
+  fakeSession('2026-07-08', [115, 115, 115, 115, 115]),
+  fakeSession('2026-07-15', [115, 115, 115, 115, 115]),
+  fakeSession('2026-08-01', [115, 115, 115, 115, 115]),
+  fakeSession('2026-08-08', [115, 115, 115, 115, 115]),
+];
+const groups25 = groupByClub(hist25);
+const gaps25 = computeGapping(groups25);
+chk('T25 sanity: trend data is actually enough', computeTrend(groups25[0].sessions).enough === true);
+chk('T25 sanity: no gap warning (single club)', !gaps25.some(g => g.gapWarning));
+const v25 = computeVerdicts(groups25, gaps25, []);
+chk('T25 exactly one fallback verdict', v25.length === 1);
+chk('T25 fallback is positive/steady, not "not enough data"', !v25[0].text.includes('Not enough data') && /steady|no notable/i.test(v25[0].text));
+
+// T26. Code-review fix regression: a lower-ordered club (7-Iron) carrying LESS
+// than the next club down (8-Iron) by more than the 8yd gapWarning threshold —
+// a crossed/inverted bag, not a merely "tight" gap. gapToNext is negative in
+// this case; the old code labeled it "Gap tight" with a negative, nonsensical
+// yardage. Must fire a distinct "Crossed clubs" verdict with a positive number.
+const crossedGapSessions = [
+  { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:32,attackAngle:2,ballSpeed:42,spin:5500,carry:95,side:0})) },
+  { date: '2026-08-01', dateAssumed: false, clubCode: '8i', club: canonicalClub('8i'), tags: {},
+    shots: Array.from({length:6},()=>({clubSpeed:31,attackAngle:2,ballSpeed:41,spin:5800,carry:110,side:0})) },
+];
+const groups26 = groupByClub(crossedGapSessions);
+const gaps26 = computeGapping(groups26);
+chk('T26 sanity: gapToNext is negative (7-Iron carries less than 8-Iron)', gaps26[0].gapToNext < 0);
+chk('T26 sanity: gap warning fires', gaps26[0].gapWarning === true);
+const v26 = computeVerdicts(groups26, gaps26, []);
+chk('T26 crossed-clubs verdict present', v26.some(v => v.text.includes('Crossed clubs')));
+chk('T26 no "Gap tight"/"Gap wide" verdict for the crossed pair', !v26.some(v => v.text.includes('Gap tight') || v.text.includes('Gap wide')));
+chk('T26 displayed yardage is positive', v26.some(v => v.text.includes('Crossed clubs') && (() => {
+  const m = v.text.match(/carries ([\d.]+) yds LESS/);
+  return m && parseFloat(m[1]) > 0;
+})()));
+```
+
+Run: `node test-range-engine.js` — expect `ALL PASS`, T21-T24 unaffected.
+
+Commit:
+```bash
+git add range.html test-range-engine.js
+git commit -m "Code-review fixes for Task 9: honest steady-state fallback, crossed-club gap wording"
 ```
 
 - [ ] **Step 4: Run to verify all tests pass**
