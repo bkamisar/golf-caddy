@@ -579,4 +579,36 @@ const p31 = parseTrackman(weirdClub);
 chk('T31 unrecognized code still parses shots', p31.sessions.length === 1 && p31.sessions[0].shots.length === 12);
 chk('T31 club falls back to Unknown-class with raw code as name', p31.sessions[0].club.klass === 'unknown' && p31.sessions[0].club.name === 'XYZ9');
 
+// T33. computeSavedSessionRows: one row per stored (date, club) entry, sorted
+// most-recent-first, with quarantine already applied to clean/total/mishitRate.
+const savedRows33 = computeSavedSessionRows(groups14);
+chk('T33 one row for the single real 7i session', savedRows33.length === 1);
+chk('T33 row names the right club and date', savedRows33[0].clubName === '7-Iron' && savedRows33[0].date === '2026-08-22');
+chk('T33 row carries the known quarantine result (10 clean of 12)', savedRows33[0].clean === 10 && savedRows33[0].total === 12);
+chk('T33 mishit rate matches (2/12 rounded)', savedRows33[0].mishitRate === Math.round(2 / 12 * 100));
+
+const twoClubSessions33 = [
+  { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+    shots: Array.from({ length: 4 }, () => ({ clubSpeed: 32, attackAngle: 2, ballSpeed: 42, spin: 5500, carry: 115, side: 0 })) },
+  { date: '2026-08-10', dateAssumed: false, clubCode: 'Dr', club: canonicalClub('Dr'), tags: {},
+    shots: Array.from({ length: 3 }, () => ({ clubSpeed: 47, attackAngle: 2, ballSpeed: 68, spin: 2400, carry: 225, side: 0 })) },
+];
+const savedRows33b = computeSavedSessionRows(groupByClub(twoClubSessions33));
+chk('T33 two different clubs on two different dates both appear', savedRows33b.length === 2);
+chk('T33 sorted most-recent-first (Driver 08-10 before 7-Iron 08-01)', savedRows33b[0].date === '2026-08-10' && savedRows33b[1].date === '2026-08-01');
+
+// T34. coachPrompt's OBJECTIVE DATA SUMMARY: exhaustive per-club facts, a full
+// trend line for clubs with enough session history, an explicit "not enough
+// history" line for clubs without, and the ball/weather caveat note when tags
+// are missing/differ (hist17 has no tags at all on any of its 5 sessions).
+const prompt34 = coachPrompt(gaps21, v21, groups21);
+chk('T34 has the objective summary section', prompt34.includes('OBJECTIVE DATA SUMMARY'));
+chk('T34 has a full trend line for 7-Iron (5 sessions, enough history)', prompt34.includes('Trend (last 2 sessions vs previous 3):'));
+chk('T34 trend line reports all 7 tracked metrics', ['carry', 'ball speed', 'spin', 'club speed', 'attack angle', 'side bias', 'mishit rate'].every(k => prompt34.includes(k)));
+chk('T34 caveat note appears (hist17 has no tags anywhere)', prompt34.includes('conditions vary or untagged'));
+chk('T34 no leftover HTML tags', !/<\/?b>/.test(prompt34));
+
+const prompt34b = coachPrompt(computeGapping(groups14), computeVerdicts(groups14, computeGapping(groups14), []), groups14);
+chk('T34 club with only 1 session gets the "not enough history" line, not a trend', prompt34b.includes('(not enough session history yet for a trend line)') && !prompt34b.includes('Trend (last 2 sessions'));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

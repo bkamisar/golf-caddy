@@ -26,6 +26,8 @@
   button { background:var(--good); color:#0c130f; border:0; border-radius:8px;
            padding:9px 14px; font-weight:700; font-size:14px; cursor:pointer; margin:6px 6px 0 0; }
   button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line); }
+  button.danger { color:var(--bad); border-color:var(--bad); }
+  button.small { padding:4px 9px; font-size:12px; margin:0; }
   .verdict { font-size:15px; margin:8px 0; padding:10px 12px; border-left:4px solid var(--accent);
              background:#131c17; border-radius:0 8px 8px 0; }
   .verdict.good { border-color:var(--good); } .verdict.bad { border-color:var(--bad); }
@@ -677,20 +679,82 @@ function computeVerdicts(groups, gaps, checks) {
   return v;
 }
 
+// ── Saved-sessions list: one row per stored (date, club) entry, with quarantine
+// counts already applied — used by the UI's delete-a-session card. Pure/testable;
+// the DOM-touching delete action itself lives in the UI section below.
+function computeSavedSessionRows(groups) {
+  const rows = [];
+  groups.forEach(g => {
+    g.sessions.forEach(sess => {
+      const total = sess.shots.length;
+      const clean = sess.shots.filter(s => !s.quarantined).length;
+      rows.push({
+        date: sess.date, clubName: g.name, clean, total,
+        mishitRate: total ? Math.round((1 - clean / total) * 100) : null,
+      });
+    });
+  });
+  rows.sort((a, b) => a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)); // most recent first
+  return rows;
+}
+
+// A club-session's gap-to-next label, shared logic with computeVerdicts' own
+// tight/wide/crossed thresholds (kept as a separate small function here rather
+// than refactoring computeVerdicts itself, which has already been through
+// several review-driven fixes — not worth the regression risk for a DRY win).
+function gapLabel(gapToNext) {
+  if (gapToNext == null) return null;
+  if (gapToNext < -3) return 'CROSSED';
+  if (gapToNext < 8) return 'tight';
+  if (gapToNext > 20) return 'wide';
+  return null;
+}
+
 // ── Coach debrief prompt ──────────────────────────────────────────────────────
-function coachPrompt(gaps, verdicts) {
-  const rows = gaps.filter(g => g.cleanCarryYd != null).map(g =>
-    `${g.name}: ${r1(g.cleanCarryYd)} yds median (n=${g.n}, mishit rate ${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : 'n/a'}` +
-    `${g.sideBiasYd != null ? `, bias ${r1(Math.abs(g.sideBiasYd))} ${g.sideBiasYd > 0 ? 'R' : 'L'}` : ''})`
-  ).join('\n');
+// groups: same quarantined {name, sessions} groups computeGapping/computeVerdicts
+// already consumed — passed in (not recomputed) so this stays cheap and consistent
+// with what the rest of the page just rendered.
+function coachPrompt(gaps, verdicts, groups) {
+  const groupByName = {};
+  (groups || []).forEach(g => { groupByName[g.name] = g; });
+
+  const sign = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + r1(v);
+  const objectiveLines = gaps.map(g => {
+    const facts = `${g.name}: ${g.cleanCarryYd != null ? r1(g.cleanCarryYd) + ' yds median' : 'no clean-shot data'} ` +
+      `(${g.n}/${g.totalN} clean, mishit ${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : 'n/a'}` +
+      `${g.sideBiasYd != null ? `, bias ${r1(Math.abs(g.sideBiasYd))}${g.sideBiasYd >= 0 ? 'R' : 'L'}` : ''})` +
+      `${g.gapToNext != null ? `, gap to next ${r1(g.gapToNext)} yds${gapLabel(g.gapToNext) ? ` [${gapLabel(g.gapToNext)}]` : ''}` : ''}` +
+      `, last hit ${g.lastSeen}`;
+
+    const grp = groupByName[g.name];
+    const t = grp ? computeTrend(grp.sessions) : { enough: false };
+    let trendLine;
+    if (t.enough) {
+      const parts = [
+        `carry ${t.carry.recent != null && t.carry.baseline != null ? sign((t.carry.recent - t.carry.baseline) * M_TO_YD) : 'n/a'}`,
+        `ball speed ${t.ballSpeed.recent != null && t.ballSpeed.baseline != null ? sign(t.ballSpeed.recent - t.ballSpeed.baseline) : 'n/a'}`,
+        `spin ${t.spin.recent != null && t.spin.baseline != null ? sign(t.spin.recent - t.spin.baseline) : 'n/a'}`,
+        `club speed ${t.clubSpeed.recent != null && t.clubSpeed.baseline != null ? sign(t.clubSpeed.recent - t.clubSpeed.baseline) : 'n/a'}`,
+        `attack angle ${t.attackAngle.recent != null && t.attackAngle.baseline != null ? sign(t.attackAngle.recent - t.attackAngle.baseline) + 'deg' : 'n/a'}`,
+        `side bias ${t.sideBias.recent != null && t.sideBias.baseline != null ? sign((t.sideBias.recent - t.sideBias.baseline) * M_TO_YD) : 'n/a'}`,
+        `mishit rate ${t.mishitRate.recent != null && t.mishitRate.baseline != null ? sign((t.mishitRate.recent - t.mishitRate.baseline) * 100) + 'pp' : 'n/a'}`,
+      ];
+      trendLine = `  Trend (last 2 sessions vs previous 3): ${parts.join(', ')}` +
+        (t.caveat ? ' [session conditions vary or untagged — carry/ball speed/spin caveated]' : '');
+    } else {
+      trendLine = '  (not enough session history yet for a trend line)';
+    }
+    return facts + '\n' + trendLine;
+  }).join('\n');
+
   return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my range data below — no generic tips.
 - FALDO (swing mechanics): tempo, fundamentals, repeatability.
 - BRYSON (data): ruthlessly quantitative, calls out what the numbers do and don't support.
 - FAXON (putting): stroke, green reading, speed.
 - PHIL (short game): chipping, pitching, scrambling — and gambler's course management.
 
-MY RANGE DATA (Trackman, clean-shot medians after mishit quarantine):
-${rows || '(no clean-shot data yet)'}
+OBJECTIVE DATA SUMMARY (facts only — read this before forming any opinions):
+${objectiveLines || '(no clean-shot data yet)'}
 
 RECENT SIGNALS:
 ${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n')}
@@ -703,6 +767,23 @@ Debrief my ball-striking as a conversation between the four of you: what's real 
 const LS = 'golfcaddy_range';
 const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
 const save = cs => localStorage.setItem(LS, JSON.stringify(cs));
+
+// Rebuilt every render(); doDeleteSession(i) looks up the real date/club by
+// index rather than embedding those strings into an onclick="..." attribute —
+// club names can be arbitrary raw pasted text (an unrecognized club falls back
+// to the raw code), and esc() alone does not make a string safe to interpolate
+// into a JS string literal nested inside an HTML attribute (HTML-entity
+// decoding happens before the JS is parsed, so an escaped quote there still
+// closes the string). A plain integer index has no such risk.
+let savedSessionRows = [];
+function doDeleteSession(i) {
+  const row = savedSessionRows[i];
+  if (!row) return;
+  if (!confirm(`Delete ${row.clubName} on ${row.date}? This removes ${row.total} shot(s).`)) return;
+  save(load().filter(cs => !(cs.date === row.date && cs.club.name === row.clubName)));
+  msg(`Deleted ${row.clubName} (${row.date}).`);
+  render();
+}
 
 function populateClubOverride() {
   const sel = document.getElementById('clubOverride');
@@ -743,7 +824,16 @@ function render() {
   const groups = groupByClub(clubSessions);
   const gaps = computeGapping(groups);
   const verdicts = computeVerdicts(groups, gaps, []);
-  const prompt = coachPrompt(gaps, verdicts);
+  const prompt = coachPrompt(gaps, verdicts, groups);
+
+  savedSessionRows = computeSavedSessionRows(groups);
+  const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
+    <td>${esc(row.clubName)}</td>
+    <td>${esc(row.date)}</td>
+    <td>${row.clean}/${row.total}</td>
+    <td>${row.mishitRate != null ? row.mishitRate + '%' : '–'}</td>
+    <td><button class="ghost danger small" onclick="doDeleteSession(${i})">Delete</button></td>
+  </tr>`).join('');
 
   const gapRows = gaps.map(g => `<tr>
     <td>${esc(g.name)}${g.lowConfidence ? ' ⚠' : ''}</td>
@@ -775,6 +865,10 @@ function render() {
   <div class="card"><h2>Club gapping (clean-shot median, driver → wedges)</h2>
     <table><tr><th>Club</th><th>Carry (yd)</th><th>Gap</th><th>Mishit</th><th>Side</th><th>Clean/Total</th><th>Last seen</th></tr>
     ${gapRows}</table>
+  </div>
+  <div class="card"><h2>Saved sessions</h2>
+    <table><tr><th>Club</th><th>Date</th><th>Clean/Total</th><th>Mishit</th><th></th></tr>
+    ${savedRowsHtml}</table>
   </div>
   <div class="card"><h2>Coach debrief — copy into Claude</h2>
     <textarea id="coach" readonly>${esc(prompt)}</textarea>
