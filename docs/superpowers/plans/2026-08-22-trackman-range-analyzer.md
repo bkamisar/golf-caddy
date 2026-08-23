@@ -871,8 +871,18 @@ function shotKey(s) {
   // unit change — a real but likely rare scenario. The tested, common case
   // (re-pasting identical text) is unaffected: identical input always produces
   // identical floats regardless of rounding precision.
+  // Guard with typeof (not just `== null`): this is the 4th code-review round
+  // (found while fixing Task 11's doImport) to find a "malformed data persists
+  // then crashes on next access" bug at this data boundary. shotKey is the
+  // actual shared chokepoint every caller funnels through (mergeClubSessions,
+  // called by both doParse's normal paste-and-save and doImport), so
+  // hardening it here — rather than doImport's validation alone — protects
+  // every current and future caller permanently. A non-numeric/garbage field
+  // degrades safely to '' in the fingerprint instead of throwing
+  // `s[k].toFixed is not a function`; worst case is a dedup-key collision
+  // between two garbage values, far better than crashing the app.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
-    .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
+    .map(k => typeof s[k] === 'number' && !isNaN(s[k]) ? s[k].toFixed(1) : '').join('|');
 }
 function mergeClubSessions(existing, incoming) {
   const key = cs => `${cs.date}|${cs.club.name}`;
@@ -1008,8 +1018,18 @@ function shotKey(s) {
   // unit change — a real but likely rare scenario. The tested, common case
   // (re-pasting identical text) is unaffected: identical input always produces
   // identical floats regardless of rounding precision.
+  // Guard with typeof (not just `== null`): this is the 4th code-review round
+  // (found while fixing Task 11's doImport) to find a "malformed data persists
+  // then crashes on next access" bug at this data boundary. shotKey is the
+  // actual shared chokepoint every caller funnels through (mergeClubSessions,
+  // called by both doParse's normal paste-and-save and doImport), so
+  // hardening it here — rather than doImport's validation alone — protects
+  // every current and future caller permanently. A non-numeric/garbage field
+  // degrades safely to '' in the fingerprint instead of throwing
+  // `s[k].toFixed is not a function`; worst case is a dedup-key collision
+  // between two garbage values, far better than crashing the app.
   return ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'carry', 'side', 'total', 'launch', 'height', 'smash']
-    .map(k => s[k] == null ? '' : s[k].toFixed(1)).join('|');
+    .map(k => typeof s[k] === 'number' && !isNaN(s[k]) ? s[k].toFixed(1) : '').join('|');
 }
 ```
 
@@ -1974,7 +1994,8 @@ function doImport(ev) {
         if (!cs || typeof cs.date !== 'string' || !cs.club || typeof cs.club.name !== 'string' || typeof cs.club.order !== 'number' || !Array.isArray(cs.shots)) {
           throw new Error('malformed club-session');
         }
-        if (!cs.shots.every(s => s && typeof s === 'object')) {
+        const NUM_FIELDS = ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'launch', 'carry', 'total', 'side', 'height', 'smash'];
+        if (!cs.shots.every(s => s && typeof s === 'object' && NUM_FIELDS.every(k => s[k] == null || typeof s[k] === 'number'))) {
           throw new Error('malformed shot');
         }
       });
@@ -1988,6 +2009,7 @@ function doImport(ev) {
       msg(`Imported ${addedShots} new shots.`);
       render();
     } catch (e) {
+      console.error(e);
       msg('Import failed unexpectedly after the file was read — please report this.');
     }
   }).catch(() => msg('Import failed — could not read the file.'));
@@ -1998,21 +2020,48 @@ populateClubOverride();
 render();
 ```
 
-**Note:** `doImport`'s validation above was added in two post-implementation code-review
-passes, not part of the original Step 2 spec. The original spec's one-line `doImport`
-(`f.text().then(t => { const {...} = mergeClubSessions(load(), JSON.parse(t)); ... })`)
-had no shape validation — malformed JSON failed silently (unhandled promise rejection).
-First pass added try/catch validating `date`/`club.name`/`shots` are the right types. A
-second review found that validation still let a `shots: [null]` array through, which
-would persist to localStorage and then crash `render()` on every future page load
-(recoverable only via "Clear all," wiping ALL stored data) — worse than the original
-silent no-op. Fixed by also validating every shot element is a non-null object and
-`club.order` is a number (both `mergeClubSessions`/`computeGapping` sort on `club.order`,
-which degrades to a silently-scrambled gapping table if missing), plus giving
-post-validation failures (defense in depth) a message distinct from file-read failures.
-Verified live in a browser: the adversarial `shots:[null]` input is now rejected before
-anything is saved, a missing-`order` club is rejected, and a well-formed import (matching
-`canonicalClub`'s real `{code,name,order,klass}` shape) still succeeds normally.
+**Note:** `doImport`'s validation above went through THREE post-implementation code-review
+rounds, not part of the original Step 2 spec. The original spec's one-line `doImport` had
+no shape validation — malformed JSON failed silently (unhandled promise rejection).
+
+1. **Round 1** added try/catch validating `date`/`club.name`/`shots` are the right types.
+2. **Round 2** found a `shots: [null]` array still passed, would persist to localStorage,
+   then crash `render()` on every future page load (recoverable only via "Clear all,"
+   wiping ALL stored data) — worse than the original silent no-op. Fixed by validating
+   every shot element is a non-null object and `club.order` is a number (both
+   `mergeClubSessions`/`computeGapping` sort on `club.order`), plus a distinct
+   post-validation error message.
+3. **Round 3** found the SAME bug class one level deeper: a shot like `{carry: "150"}`
+   (object, but a non-numeric field) still passed, and would crash — not in `doImport`
+   itself, but in `shotKey` the NEXT time anything merged into that date+club (including
+   the ordinary "paste another table for the same club" workflow, `doParse`, which has no
+   try/catch around its merge call at all). Root-fixed this time by hardening `shotKey`
+   itself (see its updated comment above) — the actual shared chokepoint every caller
+   funnels through — rather than patching `doImport`'s validation a fourth time and
+   leaving the same class of bug reachable through `doParse`. `doImport`'s validation was
+   also extended to catch non-numeric fields at the boundary (defense in depth, gives a
+   clean error instead of silently storing garbage), and the post-validation catch now
+   logs the error for traceability.
+
+Verified live in a browser at every round: the adversarial `shots:[null]` input, a
+missing-`order` club, and a non-numeric shot field are all rejected before anything is
+saved; a well-formed import (matching `canonicalClub`'s real `{code,name,order,klass}`
+shape) still succeeds normally.
+
+Regression test added to `test-range-engine.js` for round 3's root fix:
+
+```js
+// T28. shotKey must never throw regardless of field types — this is the root-
+// cause fix for a bug class found across 3 prior doImport validation rounds:
+// a shot with a non-numeric field (e.g. corrupted/imported data) must degrade
+// safely (empty string in that field's fingerprint slot), not crash.
+const garbageShot = { clubSpeed: 32, carry: '150', side: NaN };
+let threw28 = false;
+let key28;
+try { key28 = shotKey(garbageShot); } catch (e) { threw28 = true; }
+chk('T28 shotKey does not throw on non-numeric/NaN fields', !threw28);
+chk('T28 shotKey still returns a string', typeof key28 === 'string');
+```
 
 - [ ] **Step 3: Run the engine test suite to confirm nothing broke**
 
