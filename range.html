@@ -826,7 +826,8 @@ function doImport(ev) {
         if (!cs || typeof cs.date !== 'string' || !cs.club || typeof cs.club.name !== 'string' || typeof cs.club.order !== 'number' || !Array.isArray(cs.shots)) {
           throw new Error('malformed club-session');
         }
-        if (!cs.shots.every(s => s && typeof s === 'object')) {
+        const NUM_FIELDS = ['clubSpeed', 'attackAngle', 'ballSpeed', 'spin', 'launch', 'carry', 'total', 'side', 'height', 'smash'];
+        if (!cs.shots.every(s => s && typeof s === 'object' && NUM_FIELDS.every(k => s[k] == null || typeof s[k] === 'number'))) {
           throw new Error('malformed shot');
         }
       });
@@ -840,6 +841,7 @@ function doImport(ev) {
       msg(`Imported ${addedShots} new shots.`);
       render();
     } catch (e) {
+      console.error(e);
       msg('Import failed unexpectedly after the file was read — please report this.');
     }
   }).catch(() => msg('Import failed — could not read the file.'));

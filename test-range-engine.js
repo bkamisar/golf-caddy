@@ -478,4 +478,15 @@ chk('T25 prompt mentions all four coaches', ['FALDO','BRYSON','FAXON','PHIL'].ev
 chk('T25 prompt includes club yardage', prompt25.includes('7-Iron'));
 chk('T25 prompt has no leftover HTML tags', !/<\/?b>/.test(prompt25));
 
+// T28. shotKey must never throw regardless of field types — this is the root-
+// cause fix for a bug class found across 3 prior doImport validation rounds:
+// a shot with a non-numeric field (e.g. corrupted/imported data) must degrade
+// safely (empty string in that field's fingerprint slot), not crash.
+const garbageShot = { clubSpeed: 32, carry: '150', side: NaN };
+let threw28 = false;
+let key28;
+try { key28 = shotKey(garbageShot); } catch (e) { threw28 = true; }
+chk('T28 shotKey does not throw on non-numeric/NaN fields', !threw28);
+chk('T28 shotKey still returns a string', typeof key28 === 'string');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
