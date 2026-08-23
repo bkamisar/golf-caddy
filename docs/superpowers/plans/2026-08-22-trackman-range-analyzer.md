@@ -1764,18 +1764,6 @@ git add range.html test-range-engine.js
 git commit -m "Second code-review fix (Task 9): gate crossed-clubs alarm on -3yd floor"
 ```
 
-- [ ] **Step 4: Run to verify all tests pass**
-
-Run: `node test-range-engine.js`
-Expected: `ALL PASS`.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add range.html test-range-engine.js
-git commit -m "Add computeVerdicts: trend, gap-warning, and data-quality verdict cards"
-```
-
 ---
 
 ## Task 10: `coachPrompt`
