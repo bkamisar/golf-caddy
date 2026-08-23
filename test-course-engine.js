@@ -44,4 +44,20 @@ chk('C3 carries rounded carry value', lad[0].carry === 240 && lad[1].carry === 1
 chk('C3 empty input returns empty array, no divide-by-zero', ladderRows([]).length === 0);
 chk('C3 all-null input returns empty array', ladderRows([{name:'X',cleanCarryYd:null}]).length === 0);
 
+// C4. Parity check for the same fix applied to range.html: computeGapping
+// re-derives order/klass from CLUB_TABLE by name rather than trusting a
+// stale order baked into an already-stored session's club object.
+const staleHybridSession = {
+  date: '2026-08-01', dateAssumed: false, clubCode: '6h',
+  club: { code: '6h', name: '6-Hybrid', order: 999, klass: 'unknown' },
+  tags: {},
+  shots: Array.from({ length: 6 }, () => ({ clubSpeed: 32, attackAngle: 2, ballSpeed: 42, spin: 5500, carry: 116, side: 5 })),
+};
+const staleIronSession = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+  shots: Array.from({ length: 6 }, () => ({ clubSpeed: 30, attackAngle: 0, ballSpeed: 40, spin: 6000, carry: 110, side: -3 })) };
+const gapsC4 = computeGapping(groupByClub([staleHybridSession, staleIronSession]));
+const hybC4 = gapsC4.find(g => g.name === '6-Hybrid');
+chk('C4 6-Hybrid heals to the current CLUB_TABLE order despite a stale stored order', hybC4.order === canonicalClub('6h').order);
+chk('C4 6-Hybrid sorts before 7-Iron even with stale stored order:999', gapsC4.findIndex(g => g.name === '6-Hybrid') < gapsC4.findIndex(g => g.name === '7-Iron'));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

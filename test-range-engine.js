@@ -611,4 +611,27 @@ chk('T34 no leftover HTML tags', !/<\/?b>/.test(prompt34));
 const prompt34b = coachPrompt(computeGapping(groups14), computeVerdicts(groups14, computeGapping(groups14), []), groups14);
 chk('T34 club with only 1 session gets the "not enough history" line, not a trend', prompt34b.includes('(not enough session history yet for a trend line)') && !prompt34b.includes('Trend (last 2 sessions'));
 
+// T35. Bug report: 6-Hybrid showing out of order in the clubs display.
+// Root cause: computeGapping read order/klass off each session's STORED club
+// object, not a fresh CLUB_TABLE lookup by name. When 6-Hybrid/7-Hybrid were
+// added, every order value after them shifted — so any club-session saved
+// before that renumbering still carries its old, now-wrong order number
+// baked into localStorage, permanently mis-sorting the ladder until the user
+// re-pastes. Fix: re-derive order/klass from the current CLUB_TABLE by name
+// at render time, so already-stored data self-heals instead of needing a
+// manual re-paste every time CLUB_TABLE's numbering changes.
+const staleHybridSession = {
+  date: '2026-08-01', dateAssumed: false, clubCode: '6h',
+  club: { code: '6h', name: '6-Hybrid', order: 999, klass: 'unknown' }, // stale pre-renumber order baked in
+  tags: {},
+  shots: Array.from({ length: 6 }, () => ({ clubSpeed: 32, attackAngle: 2, ballSpeed: 42, spin: 5500, carry: 116, side: 5 })),
+};
+const staleIronSession = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {},
+  shots: Array.from({ length: 6 }, () => ({ clubSpeed: 30, attackAngle: 0, ballSpeed: 40, spin: 6000, carry: 110, side: -3 })) };
+const gaps35 = computeGapping(groupByClub([staleHybridSession, staleIronSession]));
+const hyb35 = gaps35.find(g => g.name === '6-Hybrid');
+chk('T35 6-Hybrid heals to the current CLUB_TABLE order despite a stale stored order', hyb35.order === canonicalClub('6h').order);
+chk('T35 6-Hybrid sorts before 7-Iron even with stale stored order:999', gaps35.findIndex(g => g.name === '6-Hybrid') < gaps35.findIndex(g => g.name === '7-Iron'));
+chk('T35 klass also heals from "unknown" to "hybrid"', hyb35.klass === 'hybrid');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

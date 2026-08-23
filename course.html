@@ -611,7 +611,12 @@ function computeGapping(groups) {
     const carries = clean.map(s => s.carry).filter(v => v != null);
     const sides = clean.map(s => s.side).filter(v => v != null);
     const medCarry = median(carries);
-    const club = g.sessions[0].club;
+    // Look up order/klass fresh from CLUB_TABLE by name rather than trusting
+    // the club object stored on the session — sessions saved before a
+    // CLUB_TABLE fix (e.g. 6-Hybrid once falling through to order:999) still
+    // carry the stale value, and re-deriving here heals that display without
+    // requiring the user to re-paste old data.
+    const club = clubByName(g.name) || g.sessions[0].club;
     return {
       name: g.name, order: club.order, klass: club.klass,
       cleanCarryYd: medCarry != null ? medCarry * M_TO_YD : null,
