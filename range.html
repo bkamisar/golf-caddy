@@ -686,6 +686,130 @@ Debrief my ball-striking as a conversation between the four of you: what's real 
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
+const LS = 'golfcaddy_range';
+const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
+const save = cs => localStorage.setItem(LS, JSON.stringify(cs));
+
+function populateClubOverride() {
+  const sel = document.getElementById('clubOverride');
+  CLUB_TABLE.forEach(row => {
+    const o = document.createElement('option');
+    o.value = row.name; o.textContent = row.name;
+    sel.appendChild(o);
+  });
+}
+
+function currentTags() {
+  const ball = document.getElementById('tagBall').value || null;
+  const venue = document.getElementById('tagVenue').value || null;
+  const tempRaw = document.getElementById('tagTemp').value;
+  const tempF = tempRaw ? parseFloat(tempRaw) : null;
+  const facility = document.getElementById('tagFacility').value.trim() || null;
+  return { ball, venue, tempF, facility };
+}
+
+function spark(vals, invert) {
+  vals = (vals || []).filter(v => v != null && !isNaN(v));
+  if (vals.length < 2) return '';
+  const w = 300, h = 44, mn = Math.min(...vals), mx = Math.max(...vals), rg = mx - mn || 1;
+  const pts = vals.map((v, i) =>
+    `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 4 - (v - mn) / rg * (h - 8)).toFixed(1)}`).join(' ');
+  const lastUp = vals[vals.length - 1] <= median(vals);
+  const col = (invert ? !lastUp : lastUp) ? 'var(--bad)' : 'var(--good)';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;width:100%;height:44px;margin-top:6px"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2"/></svg>`;
+}
+
+function render() {
+  const clubSessions = load();
+  const dash = document.getElementById('dash');
+  if (!clubSessions.length) {
+    dash.innerHTML = '<div class="card"><h2>No sessions yet</h2>Paste your Trackman club table above.</div>';
+    return;
+  }
+  const groups = groupByClub(clubSessions);
+  const gaps = computeGapping(groups);
+  const verdicts = computeVerdicts(groups, gaps, []);
+  const prompt = coachPrompt(gaps, verdicts);
+
+  const gapRows = gaps.map(g => `<tr>
+    <td>${esc(g.name)}${g.lowConfidence ? ' ⚠' : ''}</td>
+    <td>${g.cleanCarryYd != null ? Math.round(g.cleanCarryYd) : '–'}</td>
+    <td>${g.gapToNext != null ? (g.gapWarning ? `<span class="down">${Math.round(g.gapToNext)}</span>` : Math.round(g.gapToNext)) : '–'}</td>
+    <td>${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : '–'}</td>
+    <td>${g.sideBiasYd != null ? `${Math.round(Math.abs(g.sideBiasYd))}${g.sideBiasYd >= 0 ? 'R' : 'L'}` : '–'}</td>
+    <td>${g.n}/${g.totalN}</td>
+    <td>${esc(g.lastSeen)}</td>
+  </tr>`).join('');
+
+  const detailCards = groups.map(g => {
+    const allShots = g.sessions.flatMap(s => s.shots);
+    const rows = allShots.map(s => `<tr${s.quarantined ? ' style="opacity:.5"' : ''}>
+      <td>${r1(s.clubSpeed) ?? '–'}</td><td>${r1(s.ballSpeed) ?? '–'}</td>
+      <td>${r1(s.spin) ?? '–'}</td><td>${r1(s.carry) != null ? r1(s.carry * M_TO_YD) : '–'}</td>
+      <td>${r1(s.side) != null ? r1(Math.abs(s.side) * M_TO_YD) + (s.side >= 0 ? 'R' : 'L') : '–'}</td>
+      <td>${s.quarantined ? `⚠ ${s.quarantineReason === 'bad_strike' ? 'bad strike' : 'thin flier'}` : ''}</td>
+    </tr>`).join('');
+    return `<details><summary>${esc(g.name)} — ${allShots.length} shots across ${g.sessions.length} session(s)</summary>
+      <table style="margin-top:6px"><tr><th>Club spd (m/s)</th><th>Ball spd (m/s)</th><th>Spin</th><th>Carry (yd)</th><th>Side</th><th>Flag</th></tr>${rows}</table>
+    </details>`;
+  }).join('');
+
+  dash.innerHTML = `
+  <div class="card"><h2>Verdicts</h2>
+    ${verdicts.map(v => `<div class="verdict ${v.tone}">${v.text}</div>`).join('')}
+  </div>
+  <div class="card"><h2>Club gapping (clean-shot median, driver → wedges)</h2>
+    <table><tr><th>Club</th><th>Carry (yd)</th><th>Gap</th><th>Mishit</th><th>Side</th><th>Clean/Total</th><th>Last seen</th></tr>
+    ${gapRows}</table>
+  </div>
+  <div class="card"><h2>Coach debrief — copy into Claude</h2>
+    <textarea id="coach" readonly>${esc(prompt)}</textarea>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
+  </div>
+  <div class="card"><h2>Per-club detail</h2>${detailCards}</div>`;
+}
+
+function msg(t) { document.getElementById('msg').textContent = t; }
+
+function doParse() {
+  const src = document.getElementById('source').value;
+  const pasteText = document.getElementById('paste').value;
+  const result = SOURCES[src].parse(pasteText);
+  if (!result.sessions.length) {
+    msg(src === 'trackman'
+      ? 'No shots recognized — paste the whole per-club table, including the header row (Club Speed, Ball Speed, Carry, ...).'
+      : 'No rows recognized — the paste needs a header row with at least Date, Club, and one metric column.');
+    return;
+  }
+  const tags = currentTags();
+  const overrideName = document.getElementById('clubOverride').value;
+  result.sessions.forEach(s => {
+    s.tags = tags;
+    if (overrideName) { const c = clubByName(overrideName); if (c) { s.club = c; s.clubCode = overrideName; } }
+  });
+  const { all, addedShots } = mergeClubSessions(load(), result.sessions);
+  save(all);
+  const shotCount = result.sessions.reduce((n, s) => n + s.shots.length, 0);
+  let note = `Parsed ${shotCount} shots, ${addedShots} new (${all.reduce((n, s) => n + s.shots.length, 0)} total).`;
+  if (result.skipped.length) note += ` ${result.skipped.length} line(s) unrecognized.`;
+  if (result.checks && result.checks.some(c => !c.ok)) note += ` Warning: computed numbers don't match Trackman's own Average row for this paste — check the parse.`;
+  msg(note);
+  document.getElementById('paste').value = '';
+  render();
+}
+
+function doExport() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(load(), null, 1)], { type: 'application/json' }));
+  a.download = 'golf-range.json'; a.click();
+}
+function doImport(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  f.text().then(t => { const { all, addedShots } = mergeClubSessions(load(), JSON.parse(t)); save(all); msg(`Imported ${addedShots} new shots.`); render(); });
+}
+function doClear() { if (confirm('Delete all stored range sessions?')) { localStorage.removeItem(LS); render(); } }
+
+populateClubOverride();
 render();
 </script>
 </body>
