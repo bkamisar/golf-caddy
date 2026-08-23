@@ -2203,17 +2203,17 @@ vice versa.
 
 **Why clean-shot median, not Trackman's on-screen average:** the average
 includes duffs. A shot is quarantined as a mishit if its smash factor is below
-a club-class floor (bad strike) or its spin AND carry are both far below the
-session's own reference (a thin flier) — spin alone isn't enough, since your
-longest shots are often your lowest-spin ones too. Quarantined shots are shown,
-never silently dropped.
+a club-class floor (bad strike) or its spin is far below AND its carry is also
+below the session's own reference (a thin flier) — spin alone isn't enough,
+since your longest shots are often your lowest-spin ones too. Quarantined
+shots are shown, never silently dropped.
 
 **Why trend compares 2 sessions vs the previous 3, not 5 vs 10 like the round
-analyzer:** range visits are far sparser than rounds. Carry, ball speed, spin,
-and smash factor get a caveat when session ball/venue/temp tags differ or are
-missing, since range balls and weather move carry independent of your swing;
-club speed, attack angle, dispersion, and mishit rate compare freely, since
-those aren't ball- or weather-dependent.
+analyzer:** range visits are far sparser than rounds. Carry, ball speed, and
+spin get a caveat when session ball/venue/temp tags differ or are missing,
+since range balls and weather move carry independent of your swing; club
+speed, attack angle, side bias, and mishit rate compare freely, since those
+aren't ball- or weather-dependent.
 
 The `trackman` adapter is deliberately specific to Trackman's paste shape
 (icon-noise lines, the two-line club header, the Average/Consistency footer
