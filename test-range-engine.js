@@ -780,4 +780,37 @@ const tmQ = quarantineClub([{
 chk('T40 smash-factor quarantine still fires when club speed exists', tmQ[0].shots[3].quarantined === true);
 chk('T40 smash-factor path leaves good shots clean', tmQ[0].shots.filter(s => s.quarantined).length === 1);
 
+// T41. Mixed-source trend windows are flagged.
+const mkSess = (date, source, carry) => ({
+  date, dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source,
+  tags: { ball: 'range', venue: 'indoor', tempF: 70 },
+  shots: Array.from({ length: 8 }, () => ({ clubSpeed: 30, attackAngle: 0, ballSpeed: 40, spin: 6000, carry, side: -3 })),
+});
+const singleSourceTrend = computeTrend([
+  mkSess('2026-08-01', 'trackman', 108), mkSess('2026-08-02', 'trackman', 109),
+  mkSess('2026-08-03', 'trackman', 110), mkSess('2026-08-04', 'trackman', 111),
+  mkSess('2026-08-05', 'trackman', 112),
+]);
+const mixedSourceTrend = computeTrend([
+  mkSess('2026-08-01', 'trackman', 108), mkSess('2026-08-02', 'trackman', 109),
+  mkSess('2026-08-03', 'trackman', 110), mkSess('2026-08-04', 'toptracer', 111),
+  mkSess('2026-08-05', 'toptracer', 112),
+]);
+chk('T41 single-source window is not source-caveated', singleSourceTrend.enough && singleSourceTrend.sourceCaveat === false);
+chk('T41 mixed-source window is source-caveated', mixedSourceTrend.enough && mixedSourceTrend.sourceCaveat === true);
+chk('T41 sourceCaveat is independent of the conditions caveat', singleSourceTrend.caveat === false && singleSourceTrend.sourceCaveat === false);
+chk('T41 mixed-source window names the sources involved', (() => {
+  const s = mixedSourceTrend.sources;
+  return Array.isArray(s) && s.length === 2 && s.indexOf('trackman') >= 0 && s.indexOf('toptracer') >= 0;
+})());
+chk('T41 a mixed window produces the instrument warning verdict', (() => {
+  const groups = groupByClub([
+    mkSess('2026-08-01', 'trackman', 100), mkSess('2026-08-02', 'trackman', 100),
+    mkSess('2026-08-03', 'trackman', 100), mkSess('2026-08-04', 'toptracer', 120),
+    mkSess('2026-08-05', 'toptracer', 120),
+  ]);
+  const v = computeVerdicts(groups, computeGapping(groups), []);
+  return v.some(x => /different launch monitors/i.test(x.text));
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

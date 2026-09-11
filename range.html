@@ -772,11 +772,18 @@ function computeTrend(sessions) {
                           [...recentKeys][0] === [...baselineKeys][0];
   const caveat = !sameConditions;
 
+  // Instrument confound, tracked separately from the ball/weather caveat above
+  // because it has a different remedy: conditions can be tagged retroactively,
+  // but a Trackman number and a Toptracer number are not comparable at all and
+  // the only fix is to compare within one source.
+  const sources = [...new Set([...recent, ...baseline].map(s => s.source || 'unknown'))].sort();
+  const sourceCaveat = sources.length > 1;
+
   const med = (shots, key) => median(shots.map(s => s[key]).filter(v => v != null));
   const rate = (all, clean) => all.length ? 1 - clean.length / all.length : null;
 
   return {
-    enough: true, caveat,
+    enough: true, caveat, sourceCaveat, sources,
     // ball/weather-independent — compared freely
     clubSpeed:   { recent: med(recentClean, 'clubSpeed'),   baseline: med(baselineClean, 'clubSpeed') },
     attackAngle: { recent: med(recentClean, 'attackAngle'), baseline: med(baselineClean, 'attackAngle') },
@@ -798,6 +805,10 @@ function computeVerdicts(groups, gaps, checks) {
     const t = computeTrend(g.sessions);
     if (!t.enough) return;
     anyEnoughData = true;
+    if (t.sourceCaveat) {
+      v.push({ tone: 'warn',
+        text: `<b>${esc(g.name)} spans different launch monitors:</b> this window mixes ${esc(t.sources.join(' and '))}, which measure differently — treat any change below as the instrument, not your swing.` });
+    }
     if (t.carry.recent != null && t.carry.baseline != null) {
       const carryD = (t.carry.recent - t.carry.baseline) * M_TO_YD;
       if (Math.abs(carryD) >= 3) {
