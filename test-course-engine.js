@@ -74,4 +74,29 @@ chk('C4 1-Iron and 1-Hybrid recognized', canonicalClub('1i').name === '1-Iron' &
 chk('C4 6-Wood, 8-Wood, 9-Wood recognized', canonicalClub('6w').name === '6-Wood' && canonicalClub('8w').name === '8-Wood' && canonicalClub('9w').name === '9-Wood');
 chk('C4 8-Hybrid, 9-Hybrid recognized', canonicalClub('8h').name === '8-Hybrid' && canonicalClub('9h').name === '9-Hybrid');
 
+// C5. Phase 1 engine parity.
+const c5shots = () => Array.from({ length: 6 }, () => ({ clubSpeed: 30, ballSpeed: 40, spin: 6000, carry: 110, side: -3 }));
+chk('C5 SOURCES declares units and source tags', Object.keys(SOURCES).every(k => SOURCES[k].source && SOURCES[k].units));
+chk('C5 normalizeShotUnits handles feet for side', (() => {
+  const s = normalizeShotUnits({ side: 32.8084 }, { distance: 'yd', side: 'ft', speed: 'mph' });
+  return Math.abs(s.side - 10) < 0.01;
+})());
+chk('C5 healSession normalizes source', healSession({ date: '2026-08-01', clubCode: '7i', tags: {}, shots: [] }).source === 'unknown');
+chk('C5 identity is source-aware', (() => {
+  const mk = source => ({ date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source, tags: {}, shots: c5shots() });
+  return mergeClubSessions([mk('trackman')], [mk('toptracer')]).all.length === 2;
+})());
+chk('C5 tombstones filter the baseline only', (() => {
+  const s = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source: 'trackman', tags: {}, shots: c5shots() };
+  const k = tombstoneKey('2026-08-01', '7-Iron', 'trackman');
+  return composeDataset([s], [], [k]).length === 0 && composeDataset([s], [s], [k]).length === 1;
+})());
+
+// C6. preferredSource
+const mkC6 = (date, source) => ({ date, dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source, tags: {}, shots: c5shots() });
+chk('C6 picks the source with the most recent session', preferredSource([mkC6('2026-08-01', 'trackman'), mkC6('2026-09-11', 'toptracer')]) === 'toptracer');
+chk('C6 is order-independent', preferredSource([mkC6('2026-09-11', 'toptracer'), mkC6('2026-08-01', 'trackman')]) === 'toptracer');
+chk('C6 returns null on empty input', preferredSource([]) === null && preferredSource(undefined) === null);
+chk('C6 heals an untagged session to unknown', preferredSource([{ date: '2026-08-01', clubCode: '7i', tags: {}, shots: [] }]) === 'unknown');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
