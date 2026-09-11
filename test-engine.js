@@ -211,4 +211,34 @@ chk('A11 echoes a prior recommendation when supplied', (() => {
 })());
 chk('A11 no leftover HTML tags', !/<\/?b>/.test(PA11));
 
+// A12. Recommendations in the rounds analyzer. Same engine as range.html's
+// copy (this suite duplicates coverage deliberately — the two files each carry
+// their own engine and can drift), scoped to the 'round' source.
+const mkRecR = (date, source, priority, outcome) => ({
+  date, source, priority, criterion: '7 of 10 inside 3 feet',
+  outcome: outcome || 'pending', outcomeNote: null, outcomeDate: null,
+});
+
+chk('A12 recKey is date plus source', recKey(mkRecR('2026-09-01','round','A')) === '2026-09-01|round');
+chk('A12 merge dedupes on date+source', mergeRecommendations([mkRecR('2026-09-01','round','old')], [mkRecR('2026-09-01','round','new')]).length === 1);
+chk('A12 lastRecommendation is scoped to round', (() => {
+  const recs = [mkRecR('2026-09-01','range','range drill'), mkRecR('2026-09-02','round','putting drill')];
+  return lastRecommendation(recs, ['round']).priority === 'putting drill';
+})());
+chk('A12 a closed recommendation is not re-asked', lastRecommendation([mkRecR('2026-09-01','round','x','met')], ['round']) === null);
+chk('A12 closePending stamps only the open record', (() => {
+  const out = closePending([mkRecR('2026-09-01','round','x')], ['round'], 'met', 'done', '2026-09-10');
+  return out[0].outcome === 'met' && out[0].outcomeDate === '2026-09-10';
+})());
+chk('A12 the rounds prompt renders a logged priority', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+    mkR('2026-09-05','C',129,99,44,17,62),
+  ];
+  const m = computeMetrics(rounds);
+  const p = coachPrompt(m, lastRecommendation([mkRecR('2026-09-06','round','Lag putting from 30 feet')], ['round']));
+  return p.includes('Lag putting from 30 feet') && !p.includes('none on record');
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

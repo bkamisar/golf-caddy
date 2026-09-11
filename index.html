@@ -131,6 +131,16 @@
     <div id="msg"></div>
   </div>
 
+  <div class="sec">
+    <h2>Log a practice priority</h2>
+    <div id="closeOut"></div>
+    <input type="text" id="recPriority" placeholder="Priority (e.g. lag putting from 30 feet)" style="width:100%;margin-bottom:6px">
+    <input type="text" id="recCriterion" placeholder="Success criterion (e.g. 7 of 10 inside 3 feet)" style="width:100%;margin-bottom:6px">
+    <button onclick="doAddRec()">Log priority</button>
+    <button class="ghost" onclick="doSaveRecsToFile()">Save priorities to data file</button>
+    <div id="recMsg" style="color:var(--gold);font-size:12.5px;min-height:17px;margin-top:8px"></div>
+  </div>
+
   <div id="dash"></div>
   <div class="foot">Putts-vs-expected uses bogey-golfer norms (2.15 putts on greens hit, 1.95 after a miss) so low-GIR rounds aren't miscounted as bad putting. 9-hole rounds count for putting/short-game signals but not the headline differential trend. Nothing leaves your browser.</div>
 </div>
@@ -443,6 +453,56 @@ function computeMetrics(rounds) {
 // the differential formula already adjusts for slope (a harder course gives a
 // BETTER differential for the same score), so this confound is phrased as
 // affecting the raw putts/GIR/FIR stats, not the differential itself.
+// ── Recommendations ──────────────────────────────────────────────────────────
+// A dated log of practice priorities, each with a criterion specific enough to
+// be checked later. Outcomes are never inferred: a criterion is free text
+// ("8 of 10 inside 6 yards"), and a parser that half-understood one would
+// quietly mark things met that were not. The user records the outcome, and the
+// natural moment to ask is when they log the NEXT priority — they have just
+// read a debrief that told them both answers.
+var VALID_OUTCOMES = ['pending', 'met', 'not-met', 'insufficient-data'];
+var REC_SOURCES = ['range', 'round', 'video'];
+
+// Keyed by date+source so the range and round debriefs can each write a
+// priority on the same day without overwriting each other.
+function recKey(rec) {
+  return `${rec.date}|${rec.source}`;
+}
+
+function mergeRecommendations(baseline, incoming) {
+  const map = {};
+  (baseline || []).forEach(r => { map[recKey(r)] = { ...r }; });
+  (incoming || []).forEach(r => { map[recKey(r)] = { ...r }; });
+  return Object.values(map).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : (a.source < b.source ? -1 : 1));
+}
+
+// The one open question for these sources, or null. Sources are passed in
+// rather than hardcoded because a video-derived swing priority is assessed by
+// range data, while a putting drill is assessed by round data — the pages ask
+// for different slices. Only 'pending' records are returned: once an outcome
+// is recorded the loop on that recommendation is closed, and asking about it
+// again in the next debrief would be noise.
+function lastRecommendation(recs, sources) {
+  const want = sources || [];
+  const open = (recs || [])
+    .filter(r => r && r.outcome === 'pending' && want.indexOf(r.source) >= 0)
+    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return open.length ? open[open.length - 1] : null;
+}
+
+// Stamps an outcome onto the open recommendation for these sources. Returns a
+// new array; never mutates, because the caller still holds the pre-change list
+// for its own undo/compare paths.
+function closePending(recs, sources, outcome, note, when) {
+  const target = lastRecommendation(recs, sources);
+  if (!target) return (recs || []).map(r => ({ ...r }));
+  const key = recKey(target);
+  return (recs || []).map(r => recKey(r) === key
+    ? { ...r, outcome, outcomeNote: note || null, outcomeDate: when || null }
+    : { ...r });
+}
+
 function roundConfounds(m) {
   const out = [];
   const l5 = (m.full || []).slice(-5);
@@ -542,6 +602,17 @@ const saveStaging = rs => localStorage.setItem(LS, JSON.stringify(rs));
 // .all — mergeRounds returns {all, added}, and every caller of load() wants the array.
 const load = () => mergeRounds(baseline, loadStaging()).all;
 const save = rs => saveStaging(rs);
+
+// Shares data/recommendations.json with range.html, but stages under its own
+// localStorage key. Both pages are served from the same origin and therefore
+// share one localStorage — reusing range.html's key would make each page's
+// unsaved edits silently overwrite the other's.
+const LS_REC = 'golfcaddy_recs_rounds';
+const REC_URL = 'data/recommendations.json';
+let recBaseline = [];
+const loadRecStaging = () => { try { return JSON.parse(localStorage.getItem(LS_REC)) || []; } catch (e) { return []; } };
+const saveRecStaging = rs => localStorage.setItem(LS_REC, JSON.stringify(rs));
+const loadRecs = () => mergeRecommendations(recBaseline, loadRecStaging());
 // Escape any string that came from the paste before it touches innerHTML.
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -571,6 +642,31 @@ function render() {
     const d = a - b, good = inv ? d < 0 : d > 0;
     return `<span class="${Math.abs(d) < 0.03 ? 'flat' : good ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${r1(d)}</span>`;
   };
+
+  const recs = loadRecs();
+  const pending = lastRecommendation(recs, ['round']);
+  document.getElementById('closeOut').innerHTML = pending
+    ? `<div class="note warn"><span class="dot"></span><span class="txt">
+         <b>Open priority from ${esc(pending.date)}:</b> ${esc(pending.priority)}
+         <br>Criterion: ${esc(pending.criterion)}
+         <br>How did it go?
+         <select id="recOutcome">
+           <option value="met">Met it</option>
+           <option value="not-met">Did not meet it</option>
+           <option value="insufficient-data">Not enough data to tell</option>
+         </select>
+       </span></div>`
+    : '';
+
+  recRows = recs.filter(r => r.source === 'round').slice().reverse();
+  const recHistHtml = recRows.map((r, i) => `<tr>
+    <td>${esc(r.date)}</td>
+    <td>${esc(r.priority)}</td>
+    <td>${esc(r.criterion)}</td>
+    <td>${esc(r.outcome)}${r.outcomeNote ? ' — ' + esc(r.outcomeNote) : ''}</td>
+    <td><button class="ghost danger small" onclick="doDeleteRec(${i})">Delete</button></td>
+  </tr>`).join('');
+
   dash.innerHTML = `
   <div class="sec"><h2>Verdicts — ${m.n} rounds${m.hcpIndex !== null ? ` · est. index ${r1(m.hcpIndex)}` : ''}</h2>
     ${m.verdicts.map(v => `<div class="note ${v.tone}"><span class="dot"></span><span class="txt">${v.text}</span></div>`).join('')}
@@ -590,8 +686,13 @@ function render() {
     </table>
   </div>
   <div class="sec"><h2>Coach debrief — copy into Claude</h2>
-    <textarea id="coach" readonly>${esc(coachPrompt(m))}</textarea>
+    <textarea id="coach" readonly>${esc(coachPrompt(m, lastRecommendation(recs, ['round'])))}</textarea>
     <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
+  </div>
+  <div class="sec"><h2>Priority history</h2>
+    ${recRows.length
+      ? `<table><tr><th>Date</th><th>Priority</th><th>Criterion</th><th>Outcome</th><th></th></tr>${recHistHtml}</table>`
+      : '<div class="note"><span class="dot"></span><span class="txt">Nothing logged yet. After your next debrief, record the one priority it gives you.</span></div>'}
   </div>
   <div class="sec"><details><summary>All rounds (${rounds.length}, incl. 9-hole)</summary>
     <table><tr><th>Date</th><th>Course</th><th>H</th><th>Score</th><th>Putts</th><th>GIR</th><th>FIR</th><th>Diff</th></tr>
@@ -601,6 +702,63 @@ function render() {
 }
 
 function msg(t) { document.getElementById('msg').textContent = t; }
+
+// Integer-index lookup rather than embedding priority text into an onclick
+// attribute: priorities are free-form user input, and esc() does not make a
+// string safe there — HTML-entity decoding runs before the JS is parsed, so an
+// escaped quote still closes the nested string.
+let recRows = [];
+function doDeleteRec(i) {
+  const r = recRows[i];
+  if (!r) return;
+  if (!confirm(`Delete the priority logged ${r.date}?`)) return;
+  saveRecStaging(loadRecs().filter(x => recKey(x) !== recKey(r)));
+  render();
+}
+
+function doAddRec() {
+  const priority = document.getElementById('recPriority').value.trim();
+  const criterion = document.getElementById('recCriterion').value.trim();
+  const rm = t => { document.getElementById('recMsg').textContent = t; };
+  if (!priority || !criterion) { rm('Both a priority and a success criterion are required.'); return; }
+
+  let recs = loadRecs();
+  const pending = lastRecommendation(recs, ['round']);
+  if (pending) {
+    const sel = document.getElementById('recOutcome');
+    if (!sel) { rm('Could not read the outcome of the open priority.'); return; }
+    recs = closePending(recs, ['round'], sel.value, null, new Date().toISOString().slice(0, 10));
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  recs = mergeRecommendations(recs, [{
+    date: today, source: 'round', priority, criterion,
+    outcome: 'pending', outcomeNote: null, outcomeDate: null,
+  }]);
+  saveRecStaging(recs);
+  document.getElementById('recPriority').value = '';
+  document.getElementById('recCriterion').value = '';
+  rm('Logged. Save to data file and push to keep it.');
+  render();
+}
+
+function doSaveRecsToFile() {
+  const json = JSON.stringify(loadRecs(), null, 1);
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: 'recommendations.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+    }).then(handle => handle.createWritable())
+      .then(w => w.write(json).then(() => w.close()))
+      .then(() => msg('Saved. Commit and push in GitHub Desktop.'))
+      .catch(e => { if (e && e.name !== 'AbortError') msg('Save failed — use the download fallback.'); });
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = 'recommendations.json'; a.click();
+  msg('Downloaded. Save it over data/recommendations.json, then commit and push.');
+}
+
 function doParse() {
   const src = document.getElementById('source').value;
   const { rounds, skipped } = SOURCES[src].parse(document.getElementById('paste').value);
@@ -639,6 +797,10 @@ fetch(DATA_URL, { cache: 'no-store' })
   .then(r => r.ok ? r.json() : [])
   .then(d => { baseline = Array.isArray(d) ? d : []; })
   .catch(() => { baseline = []; })
+  .then(() => fetch(REC_URL, { cache: 'no-store' }))
+  .then(r => r.ok ? r.json() : [])
+  .then(d => { recBaseline = Array.isArray(d) ? d : []; })
+  .catch(() => { recBaseline = []; })
   .then(render);
 </script>
 </body>
