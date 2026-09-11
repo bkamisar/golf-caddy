@@ -99,4 +99,31 @@ chk('C6 is order-independent', preferredSource([mkC6('2026-09-11', 'toptracer'),
 chk('C6 returns null on empty input', preferredSource([]) === null && preferredSource(undefined) === null);
 chk('C6 heals an untagged session to unknown', preferredSource([{ date: '2026-08-01', clubCode: '7i', tags: {}, shots: [] }]) === 'unknown');
 
+// C7. The mirrored engine changes are present in course.html's own copy.
+chk('C7 computeGapping reports carry dispersion here too', (() => {
+  const sess = {
+    date: '2026-09-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'),
+    source: 'trackman', tags: {},
+    shots: [100,105,110,115,120,125,130,135,140,145].map(c => ({
+      clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400, carry: c / M_TO_YD, side: 0,
+    })),
+  };
+  const g = computeGapping(groupByClub([sess]))[0];
+  return Math.abs(g.carryIqrYd - 22.5) < 0.5 && g.sideIqrYd != null;
+})());
+chk('C7 rangeConfounds is present in the mirrored block', typeof rangeConfounds === 'function');
+chk('C7 the mirrored coachPrompt carries no personas', (() => {
+  const sess = {
+    date: '2026-09-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'),
+    source: 'trackman', tags: {},
+    shots: Array.from({ length: 6 }, () => ({
+      clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400, carry: 120 / M_TO_YD, side: 0,
+    })),
+  };
+  const groups = groupByClub([sess]);
+  const gaps = computeGapping(groups);
+  const p = coachPrompt(gaps, computeVerdicts(groups, gaps, []), groups, 'trackman');
+  return !/FALDO|BRYSON/i.test(p) && p.includes('ONE PRIORITY');
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
