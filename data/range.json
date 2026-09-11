@@ -1,0 +1,1214 @@
+[
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "Driver",
+  "club": {
+   "code": "Driver",
+   "name": "Driver",
+   "order": 0,
+   "klass": "driver"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 40.45705293838905,
+    "attackAngle": 4.6,
+    "ballSpeed": 56.684578039643434,
+    "spin": 3630,
+    "launch": 19.7,
+    "carry": 177.48557529649509,
+    "total": 187.1782445295855,
+    "side": 30.09899903683203,
+    "height": 95.71053666297858,
+    "smash": 1.4
+   },
+   {
+    "clubSpeed": 38.7583037542357,
+    "attackAngle": 0.8,
+    "ballSpeed": 52.25888937566497,
+    "spin": 3420,
+    "launch": 13.2,
+    "carry": 154.5340660747433,
+    "total": 180.411664121579,
+    "side": 18.263615415564306,
+    "height": 50.593904591216244,
+    "smash": 1.35
+   },
+   {
+    "clubSpeed": 38.71359982833692,
+    "attackAngle": 4.4,
+    "ballSpeed": 55.34346026268026,
+    "spin": 3660,
+    "launch": 18.8,
+    "carry": 172.3649198525983,
+    "total": 183.06343211931127,
+    "side": 30.885383011667745,
+    "height": 88.31301835206335,
+    "smash": 1.43
+   },
+   {
+    "clubSpeed": 37.90892916215902,
+    "attackAngle": 4.4,
+    "ballSpeed": 53.287079671336734,
+    "spin": 3060,
+    "launch": 16,
+    "carry": 164.5010561351853,
+    "total": 185.71520011704357,
+    "side": 22.073615293644313,
+    "height": 63.39554320095829,
+    "smash": 1.41
+   },
+   {
+    "clubSpeed": 39.51827049451483,
+    "attackAngle": 3.2,
+    "ballSpeed": 54.136454263413405,
+    "spin": 3490,
+    "launch": 17.6,
+    "carry": 170.9933157158402,
+    "total": 182.24046963725644,
+    "side": -9.424415698418699,
+    "height": 82.36940042611168,
+    "smash": 1.37
+   },
+   {
+    "clubSpeed": 41.08290790097186,
+    "attackAngle": 4,
+    "ballSpeed": 57.57865655761889,
+    "spin": 4640,
+    "launch": 20,
+    "carry": 173.18788233465312,
+    "total": 178.30853777854995,
+    "side": 47.32019848575365,
+    "height": 106.75652197767029,
+    "smash": 1.4
+   },
+   {
+    "clubSpeed": 38.93711945783078,
+    "attackAngle": 3.4,
+    "ballSpeed": 56.10342700295939,
+    "spin": 3080,
+    "launch": 17.5,
+    "carry": 180.77742522471448,
+    "total": 194.67634714386298,
+    "side": 17.525999439168018,
+    "height": 82.52484889494427,
+    "smash": 1.44
+   },
+   {
+    "clubSpeed": 39.25004693912219,
+    "attackAngle": 4.6,
+    "ballSpeed": 52.974152190045324,
+    "spin": 3970,
+    "launch": 18.4,
+    "carry": 159.83760207020785,
+    "total": 171.7248379221112,
+    "side": 41.17238268248376,
+    "height": 77.87968288512359,
+    "smash": 1.35
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "4 Hybrid",
+  "club": {
+   "code": "4h",
+   "name": "4-Hybrid",
+   "order": 8,
+   "klass": "hybrid"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 35.718436793119174,
+    "attackAngle": -0.2,
+    "ballSpeed": 48.23553604477545,
+    "spin": 5082,
+    "launch": 20.5,
+    "carry": 138.16625670943023,
+    "total": 145.29859822057225,
+    "side": 21.71699930505602,
+    "height": 75.82227667998647,
+    "smash": 1.35
+   },
+   {
+    "clubSpeed": 35.94195642261303,
+    "attackAngle": 0.6,
+    "ballSpeed": 52.124777597968645,
+    "spin": 3090,
+    "launch": 13.3,
+    "carry": 155.72278965993362,
+    "total": 183.8863946013661,
+    "side": 13.539215566745103,
+    "height": 49.45090114391785,
+    "smash": 1.45
+   },
+   {
+    "clubSpeed": 36.07606820030935,
+    "attackAngle": 4.2,
+    "ballSpeed": 42.111098196643624,
+    "spin": 5060,
+    "launch": 21.8,
+    "carry": 112.65441976573003,
+    "total": 124.90741672076882,
+    "side": 45.54321454261713,
+    "height": 55.476815318075005,
+    "smash": 1.17
+   },
+   {
+    "clubSpeed": 35.137285756435126,
+    "attackAngle": 1.4,
+    "ballSpeed": 48.05672034118036,
+    "spin": 4800,
+    "launch": 20.4,
+    "carry": 138.6234580883496,
+    "total": 146.76164263311418,
+    "side": 28.474415088818716,
+    "height": 74.13977560556323,
+    "smash": 1.37
+   },
+   {
+    "clubSpeed": 35.22669360823267,
+    "attackAngle": 2,
+    "ballSpeed": 46.00033974983683,
+    "spin": 5040,
+    "launch": 21.2,
+    "carry": 130.02807216466564,
+    "total": 137.80049560629473,
+    "side": 27.38018312383414,
+    "height": 70.40901235358126,
+    "smash": 1.31
+   },
+   {
+    "clubSpeed": 35.58432501542285,
+    "attackAngle": 1.4,
+    "ballSpeed": 47.341457526800006,
+    "spin": 4250,
+    "launch": 18.8,
+    "carry": 138.71489836413346,
+    "total": 149.9620522855497,
+    "side": 4.114799868326404,
+    "height": 66.44964841213961,
+    "smash": 1.33
+   },
+   {
+    "clubSpeed": 35.53962108952408,
+    "attackAngle": 3,
+    "ballSpeed": 46.00033974983683,
+    "spin": 4960,
+    "launch": 21.4,
+    "carry": 129.93663188888178,
+    "total": 138.349137260998,
+    "side": 29.285183062874143,
+    "height": 69.8786587540348,
+    "smash": 1.29
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "7 Iron",
+  "club": {
+   "code": "7i",
+   "name": "7-Iron",
+   "order": 15,
+   "klass": "iron"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 31.784491314027193,
+    "attackAngle": 2.2,
+    "ballSpeed": 37.32777812547498,
+    "spin": 5300,
+    "launch": 20.7,
+    "carry": 92.6289993690621,
+    "total": 109.4540101132945,
+    "side": 23.926799234342425,
+    "height": 39.62107149715163,
+    "smash": 1.18
+   },
+   {
+    "clubSpeed": 32.76797768380019,
+    "attackAngle": 2.6,
+    "ballSpeed": 44.569814121076114,
+    "spin": 3300,
+    "launch": 15.6,
+    "carry": 123.17005148087526,
+    "total": 151.15077587074003,
+    "side": -27.50819911973763,
+    "height": 40.99267563390971,
+    "smash": 1.36
+   },
+   {
+    "clubSpeed": 31.516267758634562,
+    "attackAngle": 1.8,
+    "ballSpeed": 43.54162382540434,
+    "spin": 2540,
+    "launch": 12.7,
+    "carry": 110.18553231956548,
+    "total": 151.33365642230777,
+    "side": -14.630399531827216,
+    "height": 26.060478598403453,
+    "smash": 1.38
+   },
+   {
+    "clubSpeed": 31.695083462229654,
+    "attackAngle": 2.8,
+    "ballSpeed": 41.97698641894731,
+    "spin": 5730,
+    "launch": 24.2,
+    "carry": 113.75170307513649,
+    "total": 118.2322765885462,
+    "side": -5.486399824435206,
+    "height": 69.56776181636964,
+    "smash": 1.33
+   },
+   {
+    "clubSpeed": 32.36564235071124,
+    "attackAngle": 2.2,
+    "ballSpeed": 43.18399241821416,
+    "spin": 5770,
+    "launch": 23.1,
+    "carry": 118.04939603697845,
+    "total": 122.7128501019559,
+    "side": -1.95681593738189,
+    "height": 70.40901235358126,
+    "smash": 1.34
+   },
+   {
+    "clubSpeed": 31.82919523992597,
+    "attackAngle": 4.2,
+    "ballSpeed": 40.09942153119887,
+    "spin": 2840,
+    "launch": 15.3,
+    "carry": 99.48702005285249,
+    "total": 138.9892191914851,
+    "side": 11.225783640774923,
+    "height": 28.044732582913472,
+    "smash": 1.26
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 29.772814648582433,
+    "spin": 3000,
+    "launch": 10.3,
+    "carry": 43.43413099733909,
+    "total": 79.82736075932004,
+    "side": -3.3284158934906913,
+    "height": 6.858020683790382,
+    "smash": null
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 35.852548570815486,
+    "spin": 3271,
+    "launch": 10.6,
+    "carry": 69.3117290441748,
+    "total": 111.00849480162033,
+    "side": 15.925799490374416,
+    "height": 12.49988569965527,
+    "smash": null
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 39.20534301322342,
+    "spin": 2765,
+    "launch": 9.4,
+    "carry": 78.0899955194265,
+    "total": 119.78676127687201,
+    "side": 5.385815827653894,
+    "height": 12.573037920282369,
+    "smash": null
+   },
+   {
+    "clubSpeed": 31.918603091723515,
+    "attackAngle": 3,
+    "ballSpeed": 42.289913900238716,
+    "spin": 5390,
+    "launch": null,
+    "carry": 116.03770996973327,
+    "total": null,
+    "side": -8.400287731190792,
+    "height": null,
+    "smash": 1.32
+   },
+   {
+    "clubSpeed": 32.589161980205105,
+    "attackAngle": 2,
+    "ballSpeed": 36.299587829803215,
+    "spin": 1616,
+    "launch": null,
+    "carry": 69.76893042309416,
+    "total": null,
+    "side": 21.601175308762393,
+    "height": null,
+    "smash": 1.11
+   },
+   {
+    "clubSpeed": 32.678569832002644,
+    "attackAngle": 3.8,
+    "ballSpeed": 43.09458456641662,
+    "spin": 2990,
+    "launch": null,
+    "carry": 119.32955989795265,
+    "total": null,
+    "side": 1.7007839455749139,
+    "height": null,
+    "smash": 1.32
+   },
+   {
+    "clubSpeed": 33.30442479458546,
+    "attackAngle": 4,
+    "ballSpeed": 39.60767834631237,
+    "spin": 5550,
+    "launch": null,
+    "carry": 105.06487687566866,
+    "total": null,
+    "side": 2.5999439168017946,
+    "height": null,
+    "smash": 1.19
+   },
+   {
+    "clubSpeed": 32.41034627661001,
+    "attackAngle": 1.6,
+    "ballSpeed": 38.89241553193201,
+    "spin": 5660,
+    "launch": null,
+    "carry": 101.13294501696217,
+    "total": null,
+    "side": 18.59889540483535,
+    "height": null,
+    "smash": 1.2
+   },
+   {
+    "clubSpeed": 32.49975412840755,
+    "attackAngle": 1.4,
+    "ballSpeed": 43.586327751303116,
+    "spin": 6750,
+    "launch": null,
+    "carry": 115.67194886659779,
+    "total": null,
+    "side": 9.101327708757513,
+    "height": null,
+    "smash": 1.34
+   },
+   {
+    "clubSpeed": 33.30442479458546,
+    "attackAngle": 1.8,
+    "ballSpeed": 43.80984738079698,
+    "spin": 6800,
+    "launch": null,
+    "carry": 116.12915024551714,
+    "total": null,
+    "side": 19.199351385620755,
+    "height": null,
+    "smash": 1.32
+   },
+   {
+    "clubSpeed": 32.589161980205105,
+    "attackAngle": 2.6,
+    "ballSpeed": 40.90409219737677,
+    "spin": 6240,
+    "launch": null,
+    "carry": 108.08240597653644,
+    "total": null,
+    "side": 10.198607673644554,
+    "height": null,
+    "smash": 1.26
+   },
+   {
+    "clubSpeed": 32.9020894614965,
+    "attackAngle": 3,
+    "ballSpeed": 43.98866308439207,
+    "spin": 3160,
+    "launch": null,
+    "carry": 122.62140982617204,
+    "total": null,
+    "side": -14.499335536021263,
+    "height": null,
+    "smash": 1.34
+   },
+   {
+    "clubSpeed": 32.81268160969896,
+    "attackAngle": 2.2,
+    "ballSpeed": 43.407512047708025,
+    "spin": 1970,
+    "launch": null,
+    "carry": 94.64068543630728,
+    "total": null,
+    "side": -9.198863705636361,
+    "height": null,
+    "smash": 1.32
+   },
+   {
+    "clubSpeed": 33.21501694278791,
+    "attackAngle": 1.4,
+    "ballSpeed": 42.51343352973257,
+    "spin": 5200,
+    "launch": null,
+    "carry": 117.31787383070748,
+    "total": null,
+    "side": -2.999231904024579,
+    "height": null,
+    "smash": 1.28
+   },
+   {
+    "clubSpeed": 32.99149731329405,
+    "attackAngle": 2.6,
+    "ballSpeed": 41.395835382263265,
+    "spin": 7000,
+    "launch": null,
+    "carry": 107.53376432183319,
+    "total": null,
+    "side": 17.09927945282306,
+    "height": null,
+    "smash": 1.25
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "8 Iron",
+  "club": {
+   "code": "8i",
+   "name": "8-Iron",
+   "order": 16,
+   "klass": "iron"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 32.544458054306325,
+    "attackAngle": 4.2,
+    "ballSpeed": 38.266560569349195,
+    "spin": 6400,
+    "launch": 25.9,
+    "carry": 98.20685619187829,
+    "total": 102.77886998107186,
+    "side": 9.37259970007681,
+    "height": 60.423734237982465,
+    "smash": 1.18
+   },
+   {
+    "clubSpeed": 31.56097168453333,
+    "attackAngle": 5,
+    "ballSpeed": 37.283074199576205,
+    "spin": 4160,
+    "launch": 20.6,
+    "carry": 95.73796874571374,
+    "total": 114.6661058329752,
+    "side": 14.807183526170126,
+    "height": 39.849672186611315,
+    "smash": 1.18
+   },
+   {
+    "clubSpeed": 33.08090516509159,
+    "attackAngle": 4.4,
+    "ballSpeed": 37.551297754968836,
+    "spin": 6950,
+    "launch": 27.1,
+    "carry": 94.45780488473953,
+    "total": 98.20685619187829,
+    "side": 18.36419941234562,
+    "height": 60.80778339627472,
+    "smash": 1.14
+   },
+   {
+    "clubSpeed": 32.41034627661001,
+    "attackAngle": 5.4,
+    "ballSpeed": 43.76514345489821,
+    "spin": 3070,
+    "launch": 18.2,
+    "carry": 125.63893892703982,
+    "total": 148.0418064940884,
+    "side": 1.5483839504517136,
+    "height": 48.920547544371395,
+    "smash": 1.35
+   },
+   {
+    "clubSpeed": 31.650379536330878,
+    "attackAngle": 7.2,
+    "ballSpeed": 40.05471760530009,
+    "spin": 2446,
+    "launch": 17,
+    "carry": 105.33919770302028,
+    "total": 142.1896288439206,
+    "side": 3.962399873203204,
+    "height": 33.07394775102642,
+    "smash": 1.27
+   },
+   {
+    "clubSpeed": 32.142122721217376,
+    "attackAngle": null,
+    "ballSpeed": 27.716434057238907,
+    "spin": 3350,
+    "launch": 13,
+    "carry": 43.342690721555215,
+    "total": 79.55303993196844,
+    "side": -4.800599846380805,
+    "height": 8.686826199467818,
+    "smash": 0.86
+   },
+   {
+    "clubSpeed": 32.142122721217376,
+    "attackAngle": 6.2,
+    "ballSpeed": 43.273400270011706,
+    "spin": 3765,
+    "launch": 21.2,
+    "carry": 124.63309589341723,
+    "total": 137.16041367580766,
+    "side": -5.434583826093317,
+    "height": 60.96323186510731,
+    "smash": 1.35
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 35.94195642261303,
+    "spin": 3490,
+    "launch": 9.9,
+    "carry": 67.6658040800651,
+    "total": 108.53960735545579,
+    "side": 7.772399751283208,
+    "height": 11.503186693611068,
+    "smash": null
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "9 Iron",
+  "club": {
+   "code": "9i",
+   "name": "9-Iron",
+   "order": 17,
+   "klass": "iron"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 32.276234498913695,
+    "attackAngle": 4.2,
+    "ballSpeed": 40.23353330889518,
+    "spin": 2630,
+    "launch": 14.5,
+    "carry": 98.20685619187829,
+    "total": 138.89777891570122,
+    "side": 9.348215700857098,
+    "height": 25.603277219484095,
+    "smash": 1.25
+   },
+   {
+    "clubSpeed": 33.03620123919283,
+    "attackAngle": 7,
+    "ballSpeed": 32.9020894614965,
+    "spin": 1530,
+    "launch": 6.8,
+    "carry": 25.32895639213248,
+    "total": 64.92259580654896,
+    "side": -1.3472159568890893,
+    "height": 2.3591591152238918,
+    "smash": 1
+   },
+   {
+    "clubSpeed": 32.45505020250878,
+    "attackAngle": 4.6,
+    "ballSpeed": 42.33461782613749,
+    "spin": 3910,
+    "launch": 20.9,
+    "carry": 119.96964182843975,
+    "total": 133.13704154131727,
+    "side": -7.924799746406408,
+    "height": 56.92157167546017,
+    "smash": 1.3
+   },
+   {
+    "clubSpeed": 32.72327375790142,
+    "attackAngle": 4.6,
+    "ballSpeed": 38.49008019884306,
+    "spin": 3390,
+    "launch": 14.8,
+    "carry": 85.58809813370397,
+    "total": 125.45605837547205,
+    "side": 20.497799344070422,
+    "height": 22.558316035881166,
+    "smash": 1.18
+   },
+   {
+    "clubSpeed": 32.142122721217376,
+    "attackAngle": 5.6,
+    "ballSpeed": 45.329780861355246,
+    "spin": 1610,
+    "launch": 12.4,
+    "carry": 108.99680873437515,
+    "total": 150.8764550433884,
+    "side": -7.824215749625097,
+    "height": 22.860068945967942,
+    "smash": 1.41
+   },
+   {
+    "clubSpeed": 32.142122721217376,
+    "attackAngle": null,
+    "ballSpeed": 45.37448478725401,
+    "spin": 4290,
+    "launch": 9.7,
+    "carry": 114.39178500562357,
+    "total": 155.72278965993362,
+    "side": -16.40738347496373,
+    "height": 26.060478598403453,
+    "smash": 1.41
+   },
+   {
+    "clubSpeed": 31.784491314027193,
+    "attackAngle": 4.4,
+    "ballSpeed": 43.04988064051785,
+    "spin": 1870,
+    "launch": 12.1,
+    "carry": 98.66405757079764,
+    "total": 140.6351441555948,
+    "side": -16.026383487155726,
+    "height": 20.043708451824692,
+    "smash": 1.35
+   },
+   {
+    "clubSpeed": 31.82919523992597,
+    "attackAngle": 4.2,
+    "ballSpeed": 39.92060582760378,
+    "spin": 5960,
+    "launch": 25.1,
+    "carry": 105.2477574272364,
+    "total": 110.09409204378161,
+    "side": 9.119615708172297,
+    "height": 64.08134526933733,
+    "smash": 1.25
+   },
+   {
+    "clubSpeed": 32.0974187953186,
+    "attackAngle": 8.2,
+    "ballSpeed": 32.81268160969896,
+    "spin": 4040,
+    "launch": 18.2,
+    "carry": 67.6658040800651,
+    "total": 103.23607135999123,
+    "side": 19.43099937820802,
+    "height": 21.031263430290505,
+    "smash": 1.02
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "Pitching Wedge",
+  "club": {
+   "code": "pw",
+   "name": "PW",
+   "order": 18,
+   "klass": "wedge"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 27.135283020554866,
+    "attackAngle": 1.8,
+    "ballSpeed": 31.024524573748067,
+    "spin": 7520,
+    "launch": 33.8,
+    "carry": 70.77477345671676,
+    "total": 72.96934007552967,
+    "side": 0.8625839723973129,
+    "height": 54.17836340194402,
+    "smash": 1.14
+   },
+   {
+    "clubSpeed": 26.643539835668367,
+    "attackAngle": 1.4,
+    "ballSpeed": 31.82919523992597,
+    "spin": 6610,
+    "launch": 30.5,
+    "carry": 75.07246641855872,
+    "total": 78.82151772569746,
+    "side": -8.229599736652808,
+    "height": 50.292151681129475,
+    "smash": 1.19
+   },
+   {
+    "clubSpeed": 25.704757391794146,
+    "attackAngle": 1.2,
+    "ballSpeed": 29.504591093189802,
+    "spin": 6740,
+    "launch": 31.6,
+    "carry": 66.75140132222639,
+    "total": 70.86621373250063,
+    "side": -1.8044159422586898,
+    "height": 44.57713444463749,
+    "smash": 1.15
+   },
+   {
+    "clubSpeed": 27.179986946453635,
+    "attackAngle": 3.2,
+    "ballSpeed": 27.895249760833995,
+    "spin": 7740,
+    "launch": 36.1,
+    "carry": 59.89338063843601,
+    "total": 62.087947257248935,
+    "side": 2.057399934163202,
+    "height": 46.936293559861376,
+    "smash": 1.03
+   },
+   {
+    "clubSpeed": 29.28107146369594,
+    "attackAngle": 3,
+    "ballSpeed": 31.56097168453333,
+    "spin": 8800,
+    "launch": 38.1,
+    "carry": 69.12884849260705,
+    "total": 71.32341511141998,
+    "side": 4.901183843162117,
+    "height": 64.62084289646218,
+    "smash": 1.08
+   },
+   {
+    "clubSpeed": 30.666893166557884,
+    "attackAngle": null,
+    "ballSpeed": 44.39099841748102,
+    "spin": 2460,
+    "launch": 3.7,
+    "carry": 57.9731348469747,
+    "total": 100.03566170755572,
+    "side": -5.105399836627205,
+    "height": 3.429010341895191,
+    "smash": 1.45
+   },
+   {
+    "clubSpeed": 30.845708870152976,
+    "attackAngle": 0.2,
+    "ballSpeed": 35.94195642261303,
+    "spin": 7380,
+    "launch": 27,
+    "carry": 88.51418695878787,
+    "total": 92.44611881749435,
+    "side": 11.048999646432012,
+    "height": 55.70541600753468,
+    "smash": 1.16
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "Sand Wedge",
+  "club": {
+   "code": "sw",
+   "name": "SW",
+   "order": 20,
+   "klass": "wedge"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 16.808676137938434,
+    "attackAngle": -1.8,
+    "ballSpeed": 16.71926828614089,
+    "spin": 4730,
+    "launch": 39.5,
+    "carry": 25.786157771051837,
+    "total": 31.364014593868013,
+    "side": -2.615183916314115,
+    "height": 18.28805515677435,
+    "smash": 1
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 18.865056729281967,
+    "spin": 1510,
+    "launch": 5.4,
+    "carry": 8.046744268980715,
+    "total": 32.918499282193835,
+    "side": -0.35661598858828836,
+    "height": 0.6126498477519409,
+    "smash": null
+   },
+   {
+    "clubSpeed": 20.429694135739002,
+    "attackAngle": -1.4,
+    "ballSpeed": 21.32377265371445,
+    "spin": 4960,
+    "launch": 25.7,
+    "carry": 36.85043114090032,
+    "total": 53.492561333564986,
+    "side": -4.014215871545092,
+    "height": 15.700295352090784,
+    "smash": 1.04
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 18.775648877484418,
+    "spin": 1510,
+    "launch": 6.1,
+    "carry": 8.961147026819434,
+    "total": 33.924342315816425,
+    "side": -0.024383999219712026,
+    "height": 0.7589542890061356,
+    "smash": null
+   },
+   {
+    "clubSpeed": 16.71926828614089,
+    "attackAngle": -2.8,
+    "ballSpeed": 16.00400547176053,
+    "spin": 4770,
+    "launch": 38.2,
+    "carry": 23.77447170380666,
+    "total": 30.08385073289381,
+    "side": -2.157983930944514,
+    "height": 15.928896041550463,
+    "smash": 0.96
+   },
+   {
+    "clubSpeed": 18.909760655180737,
+    "attackAngle": -3.2,
+    "ballSpeed": 21.457884431410765,
+    "spin": 2770,
+    "launch": 2.2,
+    "carry": 4.206252686058101,
+    "total": 30.81537293916479,
+    "side": 0.8900159715194889,
+    "height": 0.155448468832582,
+    "smash": 1.13
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 21.32377265371445,
+    "spin": 1540,
+    "launch": 4.2,
+    "carry": 8.412505372116202,
+    "total": 35.38738672835838,
+    "side": -0.6339839797125126,
+    "height": 0.45720137891935886,
+    "smash": null
+   },
+   {
+    "clubSpeed": 18.999168506978283,
+    "attackAngle": 0.4,
+    "ballSpeed": 18.015682137205285,
+    "spin": 5930,
+    "launch": 37.8,
+    "carry": 29.352328526622838,
+    "total": 34.930185349439014,
+    "side": -3.072383901683715,
+    "height": 20.043708451824692,
+    "smash": 0.95
+   },
+   {
+    "clubSpeed": 20.295582358042683,
+    "attackAngle": -2.8,
+    "ballSpeed": 19.625023469561096,
+    "spin": 6110,
+    "launch": 36.3,
+    "carry": 34.107222867384166,
+    "total": 40.05084079333583,
+    "side": -4.547615854476293,
+    "height": 22.631468256508263,
+    "smash": 0.97
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "Lob Wedge",
+  "club": {
+   "code": "lw",
+   "name": "LW",
+   "order": 21,
+   "klass": "wedge"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 20.60850983933409,
+    "spin": 3210,
+    "launch": 17.1,
+    "carry": 27.34064245937766,
+    "total": 56.41865015864888,
+    "side": 3.5051998878336037,
+    "height": 6.93117290441748,
+    "smash": null
+   },
+   {
+    "clubSpeed": 19.043872432877055,
+    "attackAngle": -5,
+    "ballSpeed": 16.94278791563475,
+    "spin": 5800,
+    "launch": 33.6,
+    "carry": 25.87759804683571,
+    "total": 34.107222867384166,
+    "side": -1.066799965862401,
+    "height": 14.785892594252067,
+    "smash": 0.89
+   },
+   {
+    "clubSpeed": 21.279068727815677,
+    "attackAngle": -0.6,
+    "ballSpeed": 26.15179665078187,
+    "spin": 5040,
+    "launch": 26.7,
+    "carry": 54.58984464297145,
+    "total": 67.94012490741672,
+    "side": -8.45819972933761,
+    "height": 26.444527756695717,
+    "smash": 1.23
+   },
+   {
+    "clubSpeed": 21.59199620910708,
+    "attackAngle": null,
+    "ballSpeed": 20.966141246524266,
+    "spin": 5197,
+    "launch": 14.7,
+    "carry": 25.969038322619582,
+    "total": 51.38943499053593,
+    "side": 9.805415686226699,
+    "height": 5.715017236491986,
+    "smash": 0.97
+   },
+   {
+    "clubSpeed": 21.59199620910708,
+    "attackAngle": -2.2,
+    "ballSpeed": 24.721271022021153,
+    "spin": 5710,
+    "launch": 27.9,
+    "carry": 49.5606294748585,
+    "total": 61.17354449941022,
+    "side": -5.843015813023494,
+    "height": 24.990627371732153,
+    "smash": 1.14
+   },
+   {
+    "clubSpeed": 21.90492369039849,
+    "attackAngle": 2.6,
+    "ballSpeed": 16.22752510125439,
+    "spin": 5650,
+    "launch": 46.5,
+    "carry": 23.591591152238916,
+    "total": 26.517679977322814,
+    "side": -0.17678399434291217,
+    "height": 21.717065498669545,
+    "smash": 0.74
+   },
+   {
+    "clubSpeed": 22.08373939399358,
+    "attackAngle": 4,
+    "ballSpeed": 15.46755836097526,
+    "spin": 6210,
+    "launch": 45.6,
+    "carry": 21.762785636561482,
+    "total": 24.688874461645376,
+    "side": -0.3291839894661124,
+    "height": 19.20245791461307,
+    "smash": 0.7
+   },
+   {
+    "clubSpeed": 21.681404060904626,
+    "attackAngle": 0,
+    "ballSpeed": 18.19449784080038,
+    "spin": 5380,
+    "launch": 45.1,
+    "carry": 29.07800769927122,
+    "total": 32.27841735170673,
+    "side": -0.7863839748357129,
+    "height": 26.28907928786313,
+    "smash": 0.84
+   },
+   {
+    "clubSpeed": 22.44137080118376,
+    "attackAngle": -0.2,
+    "ballSpeed": 19.937950950852503,
+    "spin": 5160,
+    "launch": 46.6,
+    "carry": 33.46714093689707,
+    "total": 36.5761103135487,
+    "side": 0.051815998341888055,
+    "height": 32.918499282193835,
+    "smash": 0.89
+   },
+   {
+    "clubSpeed": 24.229527837134658,
+    "attackAngle": null,
+    "ballSpeed": 24.944790651515014,
+    "spin": 6936,
+    "launch": 31.8,
+    "carry": 51.02367388740044,
+    "total": 57.24161264070373,
+    "side": -3.3009838943685152,
+    "height": 31.31829445597608,
+    "smash": 1.03
+   }
+  ],
+  "source": "trackman"
+ },
+ {
+  "date": "2026-08-22",
+  "dateAssumed": false,
+  "clubCode": "6 Hybrid",
+  "club": {
+   "code": "6h",
+   "name": "6h",
+   "order": 999,
+   "klass": "unknown"
+  },
+  "tags": {
+   "ball": "range",
+   "venue": "indoor",
+   "tempF": null,
+   "facility": null
+  },
+  "shots": [
+   {
+    "clubSpeed": 35.49491716362531,
+    "attackAngle": 2,
+    "ballSpeed": 46.536786860622094,
+    "spin": 5350,
+    "launch": 21.3,
+    "carry": 129.75375133731404,
+    "total": 137.89193588207863,
+    "side": 34.34181490106192,
+    "height": 70.40901235358126,
+    "smash": 1.31
+   },
+   {
+    "clubSpeed": 34.690246497447404,
+    "attackAngle": 1.8,
+    "ballSpeed": 45.10626123186138,
+    "spin": 5920,
+    "launch": 23.1,
+    "carry": 122.80429037773979,
+    "total": 128.74790830369145,
+    "side": 36.62781482790993,
+    "height": 72.76817146880515,
+    "smash": 1.3
+   },
+   {
+    "clubSpeed": 34.690246497447404,
+    "attackAngle": 1.2,
+    "ballSpeed": 45.91093189803929,
+    "spin": 3200,
+    "launch": 13.6,
+    "carry": 126.2790208575269,
+    "total": 161.20920620696594,
+    "side": -21.031199327001623,
+    "height": 37.03331169246807,
+    "smash": 1.32
+   },
+   {
+    "clubSpeed": 33.974983683067045,
+    "attackAngle": 2.8,
+    "ballSpeed": 42.37932175203626,
+    "spin": 5890,
+    "launch": 24.2,
+    "carry": 113.93458362670421,
+    "total": 119.14667934638493,
+    "side": 21.893783299398933,
+    "height": 68.65335905853092,
+    "smash": 1.25
+   },
+   {
+    "clubSpeed": null,
+    "attackAngle": null,
+    "ballSpeed": 41.97698641894731,
+    "spin": 7010,
+    "launch": 19,
+    "carry": 110.18553231956548,
+    "total": 117.22643355492359,
+    "side": 21.131783323782933,
+    "height": 53.94976271248434,
+    "smash": null
+   },
+   {
+    "clubSpeed": 34.10909546076336,
+    "attackAngle": 4.2,
+    "ballSpeed": 49.71076559943494,
+    "spin": 1550,
+    "launch": 10.1,
+    "carry": 116.952112727572,
+    "total": 159.6547215186401,
+    "side": -10.66799965862401,
+    "height": 20.418613582538566,
+    "smash": 1.46
+   },
+   {
+    "clubSpeed": 33.93027975716827,
+    "attackAngle": 5.4,
+    "ballSpeed": 44.2568866397847,
+    "spin": 4380,
+    "launch": 20.1,
+    "carry": 120.33540293157525,
+    "total": 137.617615054727,
+    "side": 44.78121456700113,
+    "height": 53.19080842347821,
+    "smash": 1.3
+   }
+  ],
+  "source": "trackman"
+ }
+]
