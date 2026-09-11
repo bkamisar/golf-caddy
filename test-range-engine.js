@@ -890,4 +890,55 @@ chk('T37 pooling both sources would land between them — which is why it is not
   return pooled > tm + 1 && pooled < tt - 1;
 })());
 
+// T43. Dispersion per club. A median alone cannot distinguish a tight club
+// from a scattered one, and the prompt needs that distinction to tell a real
+// distance change from inconsistent striking.
+const dispShots = carries => carries.map(c => ({
+  clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400,
+  carry: c / M_TO_YD, side: 0,
+}));
+const dispSess = carries => ({
+  date: '2026-09-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'),
+  source: 'trackman', tags: {}, shots: dispShots(carries),
+});
+
+chk('T43 carryIqrYd is the p75-p25 spread in yards', (() => {
+  // 10 clean carries 100..145, run through this file's existing quantile()
+  // (linear-interpolation / numpy-default definition, same one median() uses):
+  // p25 = 111.25, p75 = 133.75, IQR = 22.5.
+  const g = computeGapping(groupByClub([dispSess([100,105,110,115,120,125,130,135,140,145])]))[0];
+  return Math.abs(g.carryIqrYd - 22.5) < 0.5;
+})());
+chk('T43 a tight club reports a small IQR', (() => {
+  const g = computeGapping(groupByClub([dispSess([118,119,120,120,121,122,120,119])]))[0];
+  return g.carryIqrYd < 3;
+})());
+chk('T43 a scattered club reports a large IQR', (() => {
+  const g = computeGapping(groupByClub([dispSess([95,140,105,135,100,145,110,130])]))[0];
+  return g.carryIqrYd > 25;
+})());
+chk('T43 IQR is null below 4 clean shots, where it is meaningless', (() => {
+  const g = computeGapping(groupByClub([dispSess([118,120,122])]))[0];
+  return g.carryIqrYd === null;
+})());
+chk('T43 sideIqrYd reports left-right scatter independently of mean bias', (() => {
+  // Mean side bias is 0 but the scatter is wide: the club is not "straight".
+  const sess = {
+    date: '2026-09-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'),
+    source: 'trackman', tags: {},
+    shots: [-20,-15,-10,10,15,20,-18,18].map(s => ({
+      clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400,
+      carry: 120 / M_TO_YD, side: s / M_TO_YD,
+    })),
+  };
+  const g = computeGapping(groupByClub([sess]))[0];
+  return Math.abs(g.sideBiasYd) < 1 && g.sideIqrYd > 25;
+})());
+chk('T43 dispersion ignores quarantined shots', (() => {
+  const sess = dispSess([118,119,120,121,122,120,119,120]);
+  sess.shots.push({ clubSpeed: 33, attackAngle: 2, ballSpeed: 20, spin: 5400, carry: 20 / M_TO_YD, side: 0 });
+  const g = computeGapping(groupByClub([sess]))[0];
+  return g.carryIqrYd < 3;  // the duff is quarantined, so it cannot widen the IQR
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

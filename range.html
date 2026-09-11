@@ -733,6 +733,21 @@ function computeGapping(groups) {
     const carries = clean.map(s => s.carry).filter(v => v != null);
     const sides = clean.map(s => s.side).filter(v => v != null);
     const medCarry = median(carries);
+    // Interquartile spread, not standard deviation: the shot population is
+    // small and skewed by near-mishits that survive quarantine, and an IQR is
+    // not dragged around by one outlier the way an SD is. Null below 4 clean
+    // shots, where quartiles interpolate between too few points to mean
+    // anything. sideIqr is reported separately from sideBias because a club
+    // can average dead straight while scattering badly in both directions —
+    // that is a consistency problem, not an aim problem, and the two call for
+    // different practice.
+    const iqr = vals => {
+      if (vals.length < 4) return null;
+      const sorted = [...vals].sort((a, b) => a - b);
+      return quantile(sorted, 0.75) - quantile(sorted, 0.25);
+    };
+    const carryIqr = iqr(carries);
+    const sideIqr = iqr(sides);
     // Look up order/klass fresh from CLUB_TABLE by name rather than trusting
     // the club object stored on the session — sessions saved before a
     // CLUB_TABLE fix (e.g. 6-Hybrid once falling through to order:999) still
@@ -744,6 +759,8 @@ function computeGapping(groups) {
       cleanCarryYd: medCarry != null ? medCarry * M_TO_YD : null,
       mishitRate: allShots.length ? 1 - clean.length / allShots.length : null,
       sideBiasYd: sides.length ? mean(sides) * M_TO_YD : null,
+      carryIqrYd: carryIqr != null ? carryIqr * M_TO_YD : null,
+      sideIqrYd: sideIqr != null ? sideIqr * M_TO_YD : null,
       n: clean.length, totalN: allShots.length,
       lowConfidence: clean.length < 5,
       sessionCount: g.sessions.length,
