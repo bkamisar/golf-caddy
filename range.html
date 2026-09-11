@@ -924,6 +924,32 @@ function gapLabel(gapToNext) {
   return null;
 }
 
+// Conditions that could explain a number without any change in the swing.
+// Computed here rather than left to the model to infer, because the model
+// cannot see what is absent from the data it was handed — a club backed by
+// three shots and one backed by forty look identical once both are reduced to
+// a median.
+function rangeConfounds(gaps, sourceName) {
+  const out = [];
+  const rows = gaps || [];
+  if (sourceName) {
+    out.push(`Every number below is from ${sourceName} only. Launch monitors disagree substantially on the same swing — measured on this bag, Toptracer reads 15 to 26 yards longer than Trackman on mid and long clubs — so do not compare these against figures from another instrument.`);
+  }
+  const thin = rows.filter(g => g.n != null && g.n > 0 && g.n < 5).map(g => g.name);
+  if (thin.length) {
+    out.push(`Backed by fewer than 5 clean shots, so their medians are provisional: ${thin.join(', ')}.`);
+  }
+  const single = rows.filter(g => g.sessionCount === 1).map(g => g.name);
+  if (single.length) {
+    out.push(`Seen in only one session, so no trend exists for them yet and any change you infer is unsupported: ${single.join(', ')}.`);
+  }
+  const dates = rows.map(g => g.lastSeen).filter(Boolean).sort();
+  if (dates.length && dates[0] !== dates[dates.length - 1]) {
+    out.push(`Sessions in this data span ${dates[0]} to ${dates[dates.length - 1]}; clubs last hit at different times are not directly comparable.`);
+  }
+  return out;
+}
+
 // ── Coach debrief prompt ──────────────────────────────────────────────────────
 // groups: same quarantined {name, sessions} groups computeGapping/computeVerdicts
 // already consumed — passed in (not recomputed) so this stays cheap and consistent

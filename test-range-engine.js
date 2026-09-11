@@ -941,4 +941,30 @@ chk('T43 dispersion ignores quarantined shots', (() => {
   return g.carryIqrYd < 3;  // the duff is quarantined, so it cannot widen the IQR
 })());
 
+// T44. Confounds are computed and handed to the model rather than left for it
+// to infer. Each is a plain sentence; the prompt embeds them verbatim.
+const t44Sess = carries => ({
+  date: '2026-09-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'),
+  source: 'trackman', tags: {},
+  shots: carries.map(c => ({ clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400, carry: c / M_TO_YD, side: 0 })),
+});
+
+chk('T44 names the measurement source and warns against cross-instrument reads', (() => {
+  const c = rangeConfounds(computeGapping(groupByClub([t44Sess([118,120,122,120,119,121])])), 'toptracer');
+  return c.some(x => /toptracer/i.test(x)) && c.some(x => /instrument|Trackman/i.test(x));
+})());
+chk('T44 flags clubs with too few clean shots to trust', (() => {
+  const c = rangeConfounds(computeGapping(groupByClub([t44Sess([118,120,122])])), 'trackman');
+  return c.some(x => /fewer than 5 clean shots|7-Iron/i.test(x));
+})());
+chk('T44 flags clubs seen in only one session as having no trend', (() => {
+  const c = rangeConfounds(computeGapping(groupByClub([t44Sess([118,120,122,120,119,121])])), 'trackman');
+  return c.some(x => /one session/i.test(x));
+})());
+chk('T44 returns an array of plain strings with no HTML', (() => {
+  const c = rangeConfounds(computeGapping(groupByClub([t44Sess([118,120,122,120,119,121])])), 'trackman');
+  return Array.isArray(c) && c.every(x => typeof x === 'string' && !/[<>]/.test(x));
+})());
+chk('T44 tolerates empty gapping without throwing', Array.isArray(rangeConfounds([], null)));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
