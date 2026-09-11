@@ -1105,7 +1105,7 @@ function rangeConfounds(gaps, sourceName) {
 // passes nothing and the continuity section renders "none on record" rather
 // than being omitted, so the model still reports on it and the absence is
 // visible instead of silently skipped.
-function coachPrompt(gaps, verdicts, groups, sourceName, lastRec) {
+function coachPrompt(gaps, verdicts, groups, sourceName, lastRec, findings) {
   const groupByName = {};
   (groups || []).forEach(g => { groupByName[g.name] = g; });
 
@@ -1141,6 +1141,7 @@ function coachPrompt(gaps, verdicts, groups, sourceName, lastRec) {
   }).join('\n');
 
   const confounds = rangeConfounds(gaps, sourceName);
+  const findingLines = findingsForPrompt(findings || []);
   const priorLine = lastRec
     ? `${lastRec.priority} (success criterion: ${lastRec.criterion}, set ${lastRec.date})`
     : 'none on record';
@@ -1170,6 +1171,9 @@ ${objectiveLines || '(no clean-shot data yet)'}
 
 RECENT SIGNALS:
 ${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n') || '- (none)'}
+
+OPEN SWING FINDINGS (from video analysis — positions and mechanism only; these never establish ball flight, which only the launch monitor measures):
+${findingLines.length ? findingLines.map(l => '- ' + l).join('\n') : '- (none recorded)'}
 
 CONFOUNDS IN THIS SAMPLE:
 ${confounds.length ? confounds.map(c => '- ' + c).join('\n') : '- (none identified)'}`;
@@ -1247,6 +1251,16 @@ let recBaseline = [];
 const loadRecStaging = () => { try { return JSON.parse(localStorage.getItem(LS_REC)) || []; } catch (e) { return []; } };
 const saveRecStaging = rs => localStorage.setItem(LS_REC, JSON.stringify(rs));
 const loadRecs = () => mergeRecommendations(recBaseline, loadRecStaging());
+
+const LS_FIND = 'golfcaddy_findings';
+const FIND_URL = 'data/findings.json';
+let findBaseline = [];
+const loadFindStaging = () => { try { return JSON.parse(localStorage.getItem(LS_FIND)) || []; } catch (e) { return []; } };
+const saveFindStaging = fs => localStorage.setItem(LS_FIND, JSON.stringify(fs));
+// Graded on read so a downgrade from an unsupportable camera angle applies
+// everywhere — prompt, display, export — rather than only where someone
+// remembered to call gradeFinding.
+const loadFindings = () => mergeFindings(findBaseline, loadFindStaging()).map(gradeFinding);
 
 // Rebuilt every render(); doDeleteSession(i) looks up the real date/club by
 // index rather than embedding those strings into an onclick="..." attribute —
@@ -1407,7 +1421,7 @@ function render() {
   const gaps = computeGapping(groups);
   const verdicts = computeVerdicts(groups, gaps, []);
   const openRec = lastRecommendation(loadRecs(), ['range', 'video']);
-  const prompt = coachPrompt(gaps, verdicts, groups, chosen, openRec);
+  const prompt = coachPrompt(gaps, verdicts, groups, chosen, openRec, loadFindings());
 
   // If a priority is still open, the only way to log a new one is to say how
   // the open one went — that is the invariant that keeps the continuity check
@@ -1502,6 +1516,14 @@ function render() {
   <div class="sec"><h2>Coach debrief — copy into Claude</h2>
     <textarea id="coach" readonly>${esc(prompt)}</textarea>
     <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
+  </div>
+  <div class="sec"><h2>Open swing findings</h2>
+    ${(() => {
+      const lines = findingsForPrompt(loadFindings());
+      return lines.length
+        ? lines.map(l => `<div class="note"><span class="dot"></span><span class="txt">${esc(l)}</span></div>`).join('')
+        : '<div class="note"><span class="dot"></span><span class="txt">None recorded. Video findings are written here from a Claude Code session — see the README.</span></div>';
+    })()}
   </div>
   <div class="sec"><h2>Priority history</h2>
     ${recRows.length
@@ -1618,6 +1640,10 @@ function bootstrap() {
     .then(r => r.ok ? r.json() : [])
     .then(d => { recBaseline = Array.isArray(d) ? d : []; })
     .catch(() => { recBaseline = []; })
+    .then(() => fetch(FIND_URL, { cache: 'no-store' }))
+    .then(r => r.ok ? r.json() : [])
+    .then(d => { findBaseline = Array.isArray(d) ? d : []; })
+    .catch(() => { findBaseline = []; })
     .then(() => {
       populateClubOverride();
       document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
