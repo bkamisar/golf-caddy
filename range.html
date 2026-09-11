@@ -945,16 +945,62 @@ function applySessionDate(sessions, dateStr) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return sessions;
   return sessions.map(s => s.dateAssumed ? { ...s, date: dateStr, dateAssumed: false } : s);
 }
+// ── Dataset composition ───────────────────────────────────────────────────────
+// Canonical data lives in a committed JSON file; unpushed local edits live in
+// localStorage. The rendered dataset is baseline + staging − tombstones.
+//
+// Tombstones filter the BASELINE ONLY, never staging. A deleted session still
+// exists in the committed file until the next save-and-push, so without this the
+// next page load resurrects it. But if the same session is later re-pasted, it
+// lands in staging and must reappear — so staging always wins. Filtering both
+// would let a stale tombstone permanently swallow real new data.
+function tombstoneKey(date, clubName, source) {
+  return `${date}|${clubName}|${source}`;
+}
+function sessionTombstoneKey(cs) {
+  const h = healSession(cs);
+  return tombstoneKey(cs.date, h.club.name, h.source);
+}
+function composeDataset(baseline, staging, tombstones) {
+  const dead = new Set(tombstones || []);
+  // Heal AFTER tombstone filtering (which does its own per-item heal to compute
+  // the key) so the sessions handed to mergeClubSessions — and therefore the
+  // final render — always carry current club identity, not whatever a session
+  // was tagged with back when it was saved. mergeClubSessions itself doesn't
+  // heal; it trusts cs.club for sorting, so stale identity would otherwise
+  // survive straight through to the UI.
+  const live = healClubSessions((baseline || []).filter(cs => !dead.has(sessionTombstoneKey(cs))));
+  return mergeClubSessions(live, healClubSessions(staging || [])).all;
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
-const LS = 'golfcaddy_range';
-// healClubSessions here (not just inside groupByClub) so doDeleteSession's
+// ── Storage ──────────────────────────────────────────────────────────────────
+// Canonical data is data/range.json in the repo, served by GitHub Pages.
+// localStorage holds only what hasn't been committed yet, plus tombstones for
+// records deleted locally that still exist in the committed file.
+const LS = 'golfcaddy_range';              // staging (unpushed local edits)
+const LS_DEAD = 'golfcaddy_range_deleted'; // tombstones
+const DATA_URL = 'data/range.json';
+
+let baseline = [];   // populated by bootstrap(); [] until then
+
+const loadStaging = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
+const saveStaging = cs => localStorage.setItem(LS, JSON.stringify(cs));
+const loadTombstones = () => { try { return JSON.parse(localStorage.getItem(LS_DEAD)) || []; } catch (e) { return []; } };
+function tombstone(date, clubName, source) {
+  const k = tombstoneKey(date, clubName, source);
+  const all = loadTombstones();
+  if (all.indexOf(k) < 0) { all.push(k); localStorage.setItem(LS_DEAD, JSON.stringify(all)); }
+}
+
+// healClubSessions is applied inside composeDataset (not here) so doDeleteSession's
 // direct-array filter below also compares against a freshly-derived club
 // name, not whatever was stored — otherwise a delete on a healed-in-the-UI
 // but still-stale-on-disk row would silently match nothing.
-const load = () => { try { return healClubSessions(JSON.parse(localStorage.getItem(LS)) || []); } catch (e) { return []; } };
-const save = cs => localStorage.setItem(LS, JSON.stringify(cs));
+const load = () => composeDataset(baseline, loadStaging(), loadTombstones());
+// Anything newly entered goes to staging; the baseline only changes on save+push.
+const save = cs => saveStaging(cs);
 
 // Rebuilt every render(); doDeleteSession(i) looks up the real date/club by
 // index rather than embedding those strings into an onclick="..." attribute —
@@ -968,6 +1014,7 @@ function doDeleteSession(i) {
   const row = savedSessionRows[i];
   if (!row) return;
   if (!confirm(`Delete ${row.clubName} (${row.source}) on ${row.date}? This removes ${row.total} shot(s).`)) return;
+  tombstone(row.date, row.clubName, row.source);
   save(load().filter(cs => {
     const h = healSession(cs);
     return !(cs.date === row.date && h.club.name === row.clubName && h.source === row.source);
@@ -1153,11 +1200,29 @@ function doImport(ev) {
     }
   }).catch(() => msg('Import failed — could not read the file.'));
 }
-function doClear() { if (confirm('Delete all stored range sessions?')) { localStorage.removeItem(LS); render(); } }
+function doClear() {
+  if (!confirm('Delete all locally stored range sessions? Data already committed to data/range.json is not affected until you save and push.')) return;
+  localStorage.removeItem(LS);
+  localStorage.removeItem(LS_DEAD);
+  render();
+}
 
-populateClubOverride();
-document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
-render();
+// Fetch the committed baseline once, then render. fetch() throws on file://
+// URLs, and the file legitimately may not exist yet (404), so both degrade to
+// an empty baseline and the page runs off localStorage alone.
+function bootstrap() {
+  return Promise.resolve()
+    .then(() => fetch(DATA_URL, { cache: 'no-store' }))
+    .then(r => r.ok ? r.json() : [])
+    .then(d => { baseline = Array.isArray(d) ? d : []; })
+    .catch(() => { baseline = []; })
+    .then(() => {
+      populateClubOverride();
+      document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
+      render();
+    });
+}
+bootstrap();
 </script>
 </body>
 </html>

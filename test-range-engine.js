@@ -813,4 +813,33 @@ chk('T41 a mixed window produces the instrument warning verdict', (() => {
   return v.some(x => /different launch monitors/i.test(x.text));
 })());
 
+// T42. Baseline + staging composition and tombstones.
+const tsA = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source: 'trackman', tags: {}, shots: srcShots(6) };
+const tsB = { date: '2026-08-02', dateAssumed: false, clubCode: 'dr', club: canonicalClub('dr'), source: 'trackman', tags: {}, shots: srcShots(6) };
+
+chk('T42 tombstoneKey is date|club|source', tombstoneKey('2026-08-01', '7-Iron', 'trackman') === '2026-08-01|7-Iron|trackman');
+chk('T42 composeDataset with no staging returns the baseline', composeDataset([tsA, tsB], [], []).length === 2);
+chk('T42 composeDataset merges staging into the baseline',
+  composeDataset([tsA], [{ ...tsA, date: '2026-08-03' }], []).length === 2);
+chk('T42 a tombstone removes a baseline record', (() => {
+  const out = composeDataset([tsA, tsB], [], [tombstoneKey('2026-08-01', '7-Iron', 'trackman')]);
+  return out.length === 1 && out[0].date === '2026-08-02';
+})());
+chk('T42 a tombstone does NOT suppress a re-pasted local session', (() => {
+  const out = composeDataset([tsA], [tsA], [tombstoneKey('2026-08-01', '7-Iron', 'trackman')]);
+  return out.length === 1 && out[0].date === '2026-08-01';
+})());
+chk('T42 a tombstone for a different source leaves the record alone',
+  composeDataset([tsA], [], [tombstoneKey('2026-08-01', '7-Iron', 'toptracer')]).length === 1);
+chk('T42 composeDataset is idempotent on its own output', (() => {
+  const once = composeDataset([tsA, tsB], [], []);
+  return composeDataset(once, [], []).length === once.length;
+})());
+chk('T42 composeDataset heals stale club identity from the baseline', (() => {
+  const stale = { date: '2026-08-01', dateAssumed: false, clubCode: '6h',
+    club: { code: '6h', name: '6h', order: 999, klass: 'unknown' }, source: 'trackman', tags: {}, shots: srcShots(6) };
+  return composeDataset([stale], [], [])[0].club.name === '6-Hybrid';
+})());
+chk('T42 composeDataset tolerates a null baseline', composeDataset(null, [tsA], []).length === 1);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
