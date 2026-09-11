@@ -149,6 +149,19 @@
       <select id="sourceFilter" onchange="userChosenSource=this.value;render()" style="margin-left:6px"></select>
     </label>
   </div>
+  <div class="sec">
+    <h2>Log a practice priority</h2>
+    <div id="closeOut"></div>
+    <input type="text" id="recPriority" placeholder="Priority (e.g. ten 7-irons at 80% tempo)" style="width:100%;margin-bottom:6px">
+    <input type="text" id="recCriterion" placeholder="Success criterion (e.g. 8 of 10 inside a 6-yard window)" style="width:100%;margin-bottom:6px">
+    <select id="recSource">
+      <option value="range">From range data</option>
+      <option value="video">From video analysis</option>
+    </select>
+    <button onclick="doAddRec()">Log priority</button>
+    <button class="ghost" onclick="doSaveRecsToFile()">Save priorities to data file</button>
+    <div id="recMsg" style="color:var(--gold);font-size:12.5px;min-height:17px;margin-top:8px"></div>
+  </div>
   <div id="dash"></div>
   <div class="foot">Gapping uses the clean-shot median after mishit quarantine, not Trackman's on-screen average, which includes duffs. Trend compares your most recent 2 sessions per club against the previous 3. Nothing leaves your browser.</div>
 </div>
@@ -1165,6 +1178,63 @@ const loadRecs = () => mergeRecommendations(recBaseline, loadRecStaging());
 let userChosenSource = null;
 
 let savedSessionRows = [];
+
+// Same integer-index pattern as doDeleteSession: priority text is free-form
+// user input, and esc() does not make a string safe inside an onclick
+// attribute, because HTML-entity decoding runs before the JS is parsed.
+let recRows = [];
+function doDeleteRec(i) {
+  const r = recRows[i];
+  if (!r) return;
+  if (!confirm(`Delete the priority logged ${r.date}?`)) return;
+  saveRecStaging(loadRecs().filter(x => recKey(x) !== recKey(r)));
+  render();
+}
+
+function doAddRec() {
+  const priority = document.getElementById('recPriority').value.trim();
+  const criterion = document.getElementById('recCriterion').value.trim();
+  const source = document.getElementById('recSource').value;
+  const rm = t => { document.getElementById('recMsg').textContent = t; };
+  if (!priority || !criterion) { rm('Both a priority and a success criterion are required.'); return; }
+
+  let recs = loadRecs();
+  const pending = lastRecommendation(recs, ['range', 'video']);
+  if (pending) {
+    const sel = document.getElementById('recOutcome');
+    if (!sel) { rm('Could not read the outcome of the open priority.'); return; }
+    recs = closePending(recs, ['range', 'video'], sel.value, null, new Date().toISOString().slice(0, 10));
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  recs = mergeRecommendations(recs, [{
+    date: today, source, priority, criterion,
+    outcome: 'pending', outcomeNote: null, outcomeDate: null,
+  }]);
+  saveRecStaging(recs);
+  document.getElementById('recPriority').value = '';
+  document.getElementById('recCriterion').value = '';
+  rm('Logged. Save to data file and push to keep it.');
+  render();
+}
+
+function doSaveRecsToFile() {
+  const json = JSON.stringify(loadRecs(), null, 1);
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: 'recommendations.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+    }).then(handle => handle.createWritable())
+      .then(w => w.write(json).then(() => w.close()))
+      .then(() => msg('Saved. Commit and push in GitHub Desktop.'))
+      .catch(e => { if (e && e.name !== 'AbortError') msg('Save failed — use the download fallback.'); });
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = 'recommendations.json'; a.click();
+  msg('Downloaded. Save it over data/recommendations.json, then commit and push.');
+}
+
 function doDeleteSession(i) {
   const row = savedSessionRows[i];
   if (!row) return;
@@ -1255,6 +1325,35 @@ function render() {
   const openRec = lastRecommendation(loadRecs(), ['range', 'video']);
   const prompt = coachPrompt(gaps, verdicts, groups, chosen, openRec);
 
+  // If a priority is still open, the only way to log a new one is to say how
+  // the open one went — that is the invariant that keeps the continuity check
+  // answerable, and asking here is free because the user has just read the
+  // debrief that tells them.
+  const recs = loadRecs();
+  const pending = lastRecommendation(recs, ['range', 'video']);
+  document.getElementById('closeOut').innerHTML = pending
+    ? `<div class="note warn"><span class="dot"></span><span class="txt">
+         <b>Open priority from ${esc(pending.date)}:</b> ${esc(pending.priority)}
+         <br>Criterion: ${esc(pending.criterion)}
+         <br>How did it go?
+         <select id="recOutcome">
+           <option value="met">Met it</option>
+           <option value="not-met">Did not meet it</option>
+           <option value="insufficient-data">Not enough data to tell</option>
+         </select>
+       </span></div>`
+    : '';
+
+  recRows = recs.filter(r => r.source !== 'round').slice().reverse();
+  const recHistHtml = recRows.map((r, i) => `<tr>
+    <td>${esc(r.date)}</td>
+    <td>${esc(r.source)}</td>
+    <td>${esc(r.priority)}</td>
+    <td>${esc(r.criterion)}</td>
+    <td>${esc(r.outcome)}${r.outcomeNote ? ' — ' + esc(r.outcomeNote) : ''}</td>
+    <td><button class="ghost danger small" onclick="doDeleteRec(${i})">Delete</button></td>
+  </tr>`).join('');
+
   savedSessionRows = computeSavedSessionRows(groups);
   const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
     <td>${esc(row.clubName)}</td>
@@ -1319,6 +1418,11 @@ function render() {
   <div class="sec"><h2>Coach debrief — copy into Claude</h2>
     <textarea id="coach" readonly>${esc(prompt)}</textarea>
     <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
+  </div>
+  <div class="sec"><h2>Priority history</h2>
+    ${recRows.length
+      ? `<table><tr><th>Date</th><th>From</th><th>Priority</th><th>Criterion</th><th>Outcome</th><th></th></tr>${recHistHtml}</table>`
+      : '<div class="note"><span class="dot"></span><span class="txt">Nothing logged yet. After your next debrief, record the one priority it gives you.</span></div>'}
   </div>
   <div class="sec"><h2>Per-club detail</h2>${detailCards}</div>`;
 }
