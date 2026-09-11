@@ -1028,6 +1028,29 @@ function doDeleteSession(i) {
   render();
 }
 
+// Retag takes an integer index into savedSessionRows for the same reason delete
+// does: club names come from raw pasted text and must never reach an onclick
+// attribute, escaped or otherwise.
+function doRetagSession(i, newSource) {
+  const row = savedSessionRows[i];
+  if (!row || VALID_SOURCES.indexOf(newSource) < 0 || newSource === row.source) return;
+  const updated = load().map(cs => {
+    const h = healSession(cs);
+    return (cs.date === row.date && h.club.name === row.clubName && h.source === row.source)
+      ? { ...cs, source: newSource } : cs;
+  });
+  // Tombstone the OLD (date, club, source) key after computing `updated` (so
+  // load() above still sees the pre-tombstone baseline record to mutate) but
+  // before saving — otherwise the baseline copy under the old source survives
+  // composeDataset's filtering untouched and resurrects as a duplicate row
+  // alongside the newly-retagged one, exactly like doDeleteSession avoids for
+  // a straight delete.
+  tombstone(row.date, row.clubName, row.source);
+  save(updated);
+  msg(`Retagged ${row.clubName} (${row.date}) as ${newSource}.`);
+  render();
+}
+
 function populateClubOverride() {
   const sel = document.getElementById('clubOverride');
   CLUB_TABLE.forEach(row => {
@@ -1081,7 +1104,9 @@ function render() {
   const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
     <td>${esc(row.clubName)}</td>
     <td>${esc(row.date)}</td>
-    <td>${esc(row.source)}</td>
+    <td><select class="small" onchange="doRetagSession(${i}, this.value)">${
+      VALID_SOURCES.map(s => `<option value="${esc(s)}"${s === row.source ? ' selected' : ''}>${esc(s)}</option>`).join('')
+    }</select></td>
     <td class="num">${row.clean}/${row.total}</td>
     <td class="num">${row.mishitRate != null ? row.mishitRate + '%' : '–'}</td>
     <td><button class="ghost danger small" onclick="doDeleteSession(${i})">Delete</button></td>
