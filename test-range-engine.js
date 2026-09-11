@@ -753,4 +753,31 @@ chk('T39 saved-session rows expose the source', (() => {
   return rows.length === 2 && rows.some(r => r.source === 'trackman') && rows.some(r => r.source === 'toptracer');
 })());
 
+// T40. Fallback quarantine for sources with no club speed.
+// Real values from the project's Toptracer session: a 19-yard 7-iron off a
+// 2 ft peak, and a 45-yard drive launched at 1 degree with 1 ft of height.
+const ttClub = carries => ({
+  date: '2026-09-11', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source: 'toptracer', tags: {},
+  shots: carries.map(c => ({ clubSpeed: null, spin: null, ballSpeed: c.bs, carry: c.carry / M_TO_YD,
+                             height: c.h / 3.28084, launch: c.launch, side: 0 })),
+});
+const ttQ = quarantineClub([ttClub([
+  { carry: 139, bs: 105, h: 90, launch: 27 }, { carry: 149, bs: 114, h: 101, launch: 25 },
+  { carry: 135, bs: 105, h: 73, launch: 22 }, { carry: 144, bs: 108, h: 65, launch: 20 },
+  { carry: 135, bs: 108, h: 96, launch: 25 }, { carry: 19,  bs: 83,  h: 2,  launch: 7  },
+  { carry: 111, bs: 98,  h: 31, launch: 17 }, { carry: 140, bs: 106, h: 86, launch: 25 },
+])]);
+const ttShots = ttQ[0].shots;
+chk('T40 the 19-yard duff is quarantined despite no club speed', ttShots[5].quarantined === true);
+chk('T40 good shots are not quarantined', [0,1,2,3,4,7].every(i => !ttShots[i].quarantined));
+chk('T40 the fallback records why', typeof ttShots[5].quarantineReason === 'string' && ttShots[5].quarantineReason.length > 0);
+
+// The smash-factor path must be untouched when club speed IS present.
+const tmQ = quarantineClub([{
+  date: '2026-08-22', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source: 'trackman', tags: {},
+  shots: Array.from({ length: 8 }, (_, i) => ({ clubSpeed: 32, ballSpeed: i === 3 ? 24 : 43, spin: 5400, carry: 110, side: 2, height: 20 })),
+}]);
+chk('T40 smash-factor quarantine still fires when club speed exists', tmQ[0].shots[3].quarantined === true);
+chk('T40 smash-factor path leaves good shots clean', tmQ[0].shots.filter(s => s.quarantined).length === 1);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

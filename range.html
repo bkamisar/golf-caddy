@@ -668,6 +668,28 @@ function quarantineClub(sessions) {
       return { ...s, smash: sm, quarantined: !!reason, quarantineReason: reason };
     });
     return { ...sess, tags: { ...sess.tags }, shots };
+  }).map(sess => {
+    // Fallback for sources with no club speed (Toptracer reports neither club
+    // speed nor spin, so smash factor is uncomputable and every duff would count
+    // as clean). Judged against the club's OWN session rather than absolute
+    // thresholds, so no per-club calibration is needed and it works at any skill
+    // level. Deliberately coarse: it catches tops and chunks, not marginal thin
+    // strikes — a real limitation, not an oversight. A shot missing carry is
+    // left alone rather than guessed at.
+    const judgeable = sess.shots.filter(s => s.clubSpeed == null && s.carry != null);
+    if (judgeable.length < 4) return sess;
+    const medCarry = median(judgeable.map(s => s.carry));
+    const heights = judgeable.map(s => s.height).filter(v => v != null);
+    const medHeight = heights.length >= 4 ? median(heights) : null;
+    const shots = sess.shots.map(s => {
+      if (s.quarantined || s.clubSpeed != null || s.carry == null) return s;
+      const shortCarry = medCarry && s.carry < medCarry * 0.6;
+      const lowFlight = medHeight != null && s.height != null && s.height < medHeight * 0.25;
+      if (!shortCarry && !lowFlight) return s;
+      const reason = lowFlight && shortCarry ? 'topped' : (lowFlight ? 'low_flight' : 'well_short');
+      return { ...s, quarantined: true, quarantineReason: reason };
+    });
+    return { ...sess, shots };
   });
 }
 
@@ -1018,7 +1040,7 @@ function render() {
       <td class="num">${r1(s.clubSpeed) ?? '–'}</td><td class="num">${r1(s.ballSpeed) ?? '–'}</td>
       <td class="num">${r1(s.spin) ?? '–'}</td><td class="num">${r1(s.carry) != null ? r1(s.carry * M_TO_YD) : '–'}</td>
       <td class="num">${r1(s.side) != null ? r1(Math.abs(s.side) * M_TO_YD) + (s.side >= 0 ? 'R' : 'L') : '–'}</td>
-      <td>${s.quarantined ? `⚠ ${s.quarantineReason === 'bad_strike' ? 'bad strike' : 'thin flier'}` : ''}</td>
+      <td>${s.quarantined ? `⚠ ${s.quarantineReason === 'bad_strike' ? 'bad strike' : s.quarantineReason === 'thin_flier' ? 'thin flier' : s.quarantineReason === 'topped' ? 'topped' : s.quarantineReason === 'low_flight' ? 'low flight' : s.quarantineReason === 'well_short' ? 'well short' : 'thin flier'}` : ''}</td>
     </tr>`).join('');
     return `<details><summary>${esc(g.name)} — ${allShots.length} shots across ${g.sessions.length} session(s)</summary>
       <table style="margin-top:6px"><tr><th>Club spd</th><th>Ball spd</th><th>Spin</th><th>Carry (yd)</th><th>Side</th><th>Flag</th></tr>${rows}</table>
