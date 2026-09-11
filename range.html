@@ -233,7 +233,11 @@ function clubByName(name) {
 // spelled-out forms ("6 Hybrid") and is a no-op on already-short codes, so
 // it's safe to apply unconditionally here.
 function healSession(cs) {
-  return { ...cs, club: canonicalClub(normalizeClubCode(cs.clubCode)) };
+  return {
+    ...cs,
+    club: canonicalClub(normalizeClubCode(cs.clubCode)),
+    source: VALID_SOURCES.indexOf(cs.source) >= 0 ? cs.source : 'unknown',
+  };
 }
 function healClubSessions(clubSessions) {
   return (clubSessions || []).map(healSession);
@@ -1057,6 +1061,7 @@ function doParse() {
   const overrideName = document.getElementById('clubOverride').value;
   result.sessions.forEach(s => {
     s.tags = tags;
+    s.source = SOURCES[src].source;
     if (overrideName) { const c = clubByName(overrideName); if (c) { s.club = c; s.clubCode = overrideName; } }
   });
   const { all, addedShots } = mergeClubSessions(load(), result.sessions);

@@ -724,4 +724,12 @@ chk('T37 applySessionDate rejects a malformed date', (() => {
   return out[0].date === '0000-00-00';
 })());
 
+// T38. source is part of the stored model, normalized on read.
+chk('T38 healSession normalizes a missing source to "unknown"',
+  healSession({ date: '2026-08-01', clubCode: '7i', club: canonicalClub('7i'), tags: {}, shots: [] }).source === 'unknown');
+chk('T38 healSession preserves an explicit source',
+  healSession({ date: '2026-08-01', clubCode: '7i', club: canonicalClub('7i'), source: 'toptracer', tags: {}, shots: [] }).source === 'toptracer');
+chk('T38 healSession rejects an unrecognized source as "unknown"',
+  healSession({ date: '2026-08-01', clubCode: '7i', club: canonicalClub('7i'), source: 'nonsense', tags: {}, shots: [] }).source === 'unknown');
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
