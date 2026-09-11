@@ -489,8 +489,8 @@ chk('T27 does not affect T26 (strongly-crossed bag)', v26.some(v => v.text.inclu
 // reusing `v25` here would be a real SyntaxError (duplicate const), not just a
 // cosmetic label clash, so this test's local variables are suffixed "b".
 const v25b = computeVerdicts(groups21, gaps21, []);
-const prompt25 = coachPrompt(gaps21, v25b);
-chk('T25 prompt mentions all four coaches', ['FALDO','BRYSON','FAXON','PHIL'].every(name => prompt25.includes(name)));
+const prompt25 = coachPrompt(gaps21, v25b, groups21, 'trackman');
+chk('T25 prompt is the single-analyst brief, not the four-coach debrief', prompt25.includes('golf performance analyst') && ['FALDO','BRYSON','FAXON','PHIL'].every(name => !prompt25.includes(name)));
 chk('T25 prompt includes club yardage', prompt25.includes('7-Iron'));
 chk('T25 prompt has no leftover HTML tags', !/<\/?b>/.test(prompt25));
 
@@ -606,7 +606,7 @@ chk('T33 sorted most-recent-first (Driver 08-10 before 7-Iron 08-01)', savedRows
 // history" line for clubs without, and the ball/weather caveat note when tags
 // are missing/differ (hist17 has no tags at all on any of its 5 sessions).
 const prompt34 = coachPrompt(gaps21, v21, groups21);
-chk('T34 has the objective summary section', prompt34.includes('OBJECTIVE DATA SUMMARY'));
+chk('T34 has the objective summary section', prompt34.includes('PER-CLUB DATA'));
 chk('T34 has a full trend line for 7-Iron (5 sessions, enough history)', prompt34.includes('Trend (last 2 sessions vs previous 3):'));
 chk('T34 trend line reports all 7 tracked metrics', ['carry', 'ball speed', 'spin', 'club speed', 'attack angle', 'side bias', 'mishit rate'].every(k => prompt34.includes(k)));
 chk('T34 caveat note appears (hist17 has no tags anywhere)', prompt34.includes('conditions vary or untagged'));
@@ -966,5 +966,41 @@ chk('T44 returns an array of plain strings with no HTML', (() => {
   return Array.isArray(c) && c.every(x => typeof x === 'string' && !/[<>]/.test(x));
 })());
 chk('T44 tolerates empty gapping without throwing', Array.isArray(rangeConfounds([], null)));
+
+// T45. The rewritten range prompt. Asserts shape, not prose: the personas are
+// gone, every section is present, and the honesty rules survive edits.
+const promptFixture = (() => {
+  const sess = n => ({
+    date: n, dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'),
+    source: 'toptracer', tags: {},
+    shots: Array.from({ length: 8 }, (_, i) => ({
+      clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400,
+      carry: (120 + i * 0.5) / M_TO_YD, side: 2 / M_TO_YD,
+    })),
+  });
+  const sessions = ['2026-08-01','2026-08-08','2026-08-15','2026-09-01','2026-09-08'].map(sess);
+  const groups = groupByClub(sessions);
+  const gaps = computeGapping(groups);
+  return { gaps, groups, verdicts: computeVerdicts(groups, gaps, []) };
+})();
+const P45 = coachPrompt(promptFixture.gaps, promptFixture.verdicts, promptFixture.groups, 'toptracer');
+
+chk('T45 no personas remain', !/FALDO|BRYSON|FAXON|PHIL/i.test(P45));
+chk('T45 no conversational-debrief framing remains', !/conversation between|disagree where/i.test(P45));
+chk('T45 all five sections present', ['CONTINUITY CHECK','WHAT IS REAL','CONSISTENCY','GAPPING','ONE PRIORITY']
+  .every(h => P45.includes(h)));
+chk('T45 carries the honesty rules', /could plausibly be normal variation/i.test(P45) && /not enough data/i.test(P45));
+chk('T45 forbids manufacturing a finding', /do not invent|not manufacture|nothing significant/i.test(P45));
+chk('T45 demands a numeric success criterion', /numeric success criterion/i.test(P45));
+chk('T45 states the measurement source', /toptracer/i.test(P45));
+chk('T45 includes a confounds block', /CONFOUNDS/.test(P45));
+chk('T45 reports sample size and spread per club', /clean of/i.test(P45) && /spread/i.test(P45));
+chk('T45 continuity degrades to none on record with no prior recommendation', /none on record/i.test(P45));
+chk('T45 echoes a prior recommendation when one is supplied', (() => {
+  const prior = { date: '2026-09-01', priority: 'Ten 7-irons at 80% tempo', criterion: '8 of 10 within 5 yards of median' };
+  const p = coachPrompt(promptFixture.gaps, promptFixture.verdicts, promptFixture.groups, 'toptracer', prior);
+  return p.includes('Ten 7-irons at 80% tempo') && p.includes('8 of 10 within 5 yards of median');
+})());
+chk('T45 no leftover HTML tags', !/<\/?b>/.test(P45));
 
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

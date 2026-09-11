@@ -954,15 +954,21 @@ function rangeConfounds(gaps, sourceName) {
 // groups: same quarantined {name, sessions} groups computeGapping/computeVerdicts
 // already consumed — passed in (not recomputed) so this stays cheap and consistent
 // with what the rest of the page just rendered.
-function coachPrompt(gaps, verdicts, groups) {
+// lastRec is Phase 2b's recommendations store; until that lands every caller
+// passes nothing and the continuity section renders "none on record" rather
+// than being omitted, so the model still reports on it and the absence is
+// visible instead of silently skipped.
+function coachPrompt(gaps, verdicts, groups, sourceName, lastRec) {
   const groupByName = {};
   (groups || []).forEach(g => { groupByName[g.name] = g; });
 
   const sign = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + r1(v);
   const objectiveLines = gaps.map(g => {
     const facts = `${g.name}: ${g.cleanCarryYd != null ? r1(g.cleanCarryYd) + ' yds median' : 'no clean-shot data'} ` +
-      `(${g.n}/${g.totalN} clean, mishit ${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : 'n/a'}` +
-      `${g.sideBiasYd != null ? `, bias ${r1(Math.abs(g.sideBiasYd))}${g.sideBiasYd >= 0 ? 'R' : 'L'}` : ''})` +
+      `(${g.n} clean of ${g.totalN}, mishit ${g.mishitRate != null ? Math.round(g.mishitRate * 100) + '%' : 'n/a'}` +
+      `${g.carryIqrYd != null ? `, carry spread ${r1(g.carryIqrYd)} yds` : ''}` +
+      `${g.sideBiasYd != null ? `, bias ${r1(Math.abs(g.sideBiasYd))}${g.sideBiasYd >= 0 ? 'R' : 'L'}` : ''}` +
+      `${g.sideIqrYd != null ? `, side spread ${r1(g.sideIqrYd)} yds` : ''})` +
       `${g.gapToNext != null ? `, gap to next ${r1(g.gapToNext)} yds${gapLabel(g.gapToNext) ? ` [${gapLabel(g.gapToNext)}]` : ''}` : ''}` +
       `, last hit ${g.lastSeen}`;
 
@@ -987,19 +993,39 @@ function coachPrompt(gaps, verdicts, groups) {
     return facts + '\n' + trendLine;
   }).join('\n');
 
-  return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my range data below — no generic tips.
-- FALDO (swing mechanics): tempo, fundamentals, repeatability.
-- BRYSON (data): ruthlessly quantitative, calls out what the numbers do and don't support.
-- FAXON (putting): stroke, green reading, speed.
-- PHIL (short game): chipping, pitching, scrambling — and gambler's course management.
+  const confounds = rangeConfounds(gaps, sourceName);
+  const priorLine = lastRec
+    ? `${lastRec.priority} (success criterion: ${lastRec.criterion}, set ${lastRec.date})`
+    : 'none on record';
 
-OBJECTIVE DATA SUMMARY (facts only — read this before forming any opinions):
+  return `You are my golf performance analyst. Give me one clear, prioritized read of my ball-striking. No personas, no debate format, no conversation. Ground every claim in the specific numbers below, and do not offer generic golf advice that is not tied to something in this data.
+
+I am still learning golf terminology — define any term that is not obvious the first time you use it.
+
+BEFORE YOU ANALYZE — rules about being honest with this data:
+- Sample sizes are small. Where a difference could plausibly be normal variation between sessions, say so instead of building a story on it. A handful of shots per club is not enough to establish a trend.
+- Read the CONFOUNDS block and factor it in. If a confound explains a number, say that rather than crediting or blaming my swing.
+- Spread matters as much as the median. A club whose carry spread is wide is a consistency problem, not a distance problem, and the two call for different practice.
+- If a section below is not supported by the data, write "not enough data" for that section. Do not invent a finding so that every section has content, and if nothing in this data is significant, say that plainly.
+
+Structure your response exactly as:
+
+1. CONTINUITY CHECK — My last priority was: ${priorLine}. Did I meet it? Answer met, not met, or not enough data, and say which numbers show it.
+2. WHAT IS REAL — What in the recent trend is a genuine change, and what is noise? Say how confident you are and why.
+3. CONSISTENCY — What do the mishit rates and the carry and side spreads say about strike quality? Name the least consistent clubs.
+4. GAPPING — Any real problems in the distance ladder: overlapping clubs, gaps too wide to cover, or a club that is not earning its place in the bag.
+5. ONE PRIORITY — One specific drill for my next range session, with a numeric success criterion I can check (for example "8 of 10 inside a 6-yard window"). Tie it to the single biggest thing above. If the biggest problem is ambiguous, pick the drill that would diagnose it rather than guessing at a fix.
+
+MEASUREMENT SOURCE: ${sourceName || 'unknown'}
+
+PER-CLUB DATA (facts only — read before forming any opinion):
 ${objectiveLines || '(no clean-shot data yet)'}
 
 RECENT SIGNALS:
-${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n')}
+${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n') || '- (none)'}
 
-Debrief my ball-striking as a conversation between the four of you: what's real in the recent trend, what's noise, where you disagree, and end with ONE range priority each (a specific drill with success criteria), then a consensus pick for the single most valuable thing to work on next session.`;
+CONFOUNDS IN THIS SAMPLE:
+${confounds.length ? confounds.map(c => '- ' + c).join('\n') : '- (none identified)'}`;
 }
 // Neither Trackman's nor Toptracer's CSV export has a date column, so the form
 // supplies one. Applied only where the parser genuinely found no date
@@ -1166,7 +1192,7 @@ function render() {
   const groups = groupByClub(clubSessions);
   const gaps = computeGapping(groups);
   const verdicts = computeVerdicts(groups, gaps, []);
-  const prompt = coachPrompt(gaps, verdicts, groups);
+  const prompt = coachPrompt(gaps, verdicts, groups, chosen);
 
   savedSessionRows = computeSavedSessionRows(groups);
   const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
