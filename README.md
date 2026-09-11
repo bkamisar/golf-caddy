@@ -129,3 +129,46 @@ works. To get data from the computer you paste on to the phone you carry: hit
 (AirDrop, email, a cloud-drive folder), then tap **Refresh data (import)** on
 `course.html`. Importing merges rather than replaces, so re-importing after a new
 range session is safe.
+
+## Where the data lives
+
+Canonical data is committed JSON in this repo: `data/range.json` and
+`data/rounds.json`. The pages fetch those as a baseline and merge in anything
+entered locally but not yet committed.
+
+The loop: paste on your computer → **Save to data file** → commit and push in
+GitHub Desktop → your phone sees it.
+
+Pushing is the *sync* step, not the save step. Forget to push and nothing is
+lost — your computer still has everything in browser storage. Only the phone
+view goes stale.
+
+## Units and sources
+
+Every launch monitor export declares its own units, normalized on import to the
+engine's internal metric. Trackman's table paste is metric; its CSV export and
+Toptracer's CSV are both yards, with offline in feet. Picking the wrong source
+in the dropdown will silently scale every distance, so pick the one that matches
+what you pasted.
+
+The two instruments do not agree — measured across one session each, Toptracer
+reads 12–20% hotter on ball speed than Trackman, and correspondingly longer on
+carry. The tool therefore keeps them as separate sessions and refuses to trend
+across them; a trend window spanning both gets flagged as measuring the
+instrument rather than your swing.
+
+Every session needs a date. No CSV export supplies one, so the form has a date
+field and will refuse a paste without it — undated sessions all collapse into a
+single bucket and make trends impossible.
+
+`course.html`'s on-course yardage ladder always shows exactly one source at a
+time (defaulting to whichever has the most recent data), since a ladder
+blending two instruments' carries would produce a number matching neither —
+not something to club off of on the tee. `range.html` allows an "All sources"
+view for broader analysis.
+
+## Opening the files directly
+
+Double-clicking the HTML (a `file://` URL) still works, but browsers block
+`fetch` there, so you'll only see browser-storage data. Serve the folder over
+HTTP, or use the Pages URL, to see committed data.
