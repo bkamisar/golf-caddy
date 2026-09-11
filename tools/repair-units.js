@@ -45,8 +45,18 @@ const out = data.map(s => ({
 
 fs.writeFileSync(outPath, JSON.stringify(out, null, 1));
 console.log(`Repaired ${out.length} club-sessions, ${shots} shots -> ${outPath}`);
+// True median (average the two middle values for an even count) — the app's
+// own median() does this, and c[floor(n/2)] alone is off by up to a yard on
+// an even-length club (LW's 10 shots printed 32 here vs the real 31 the app
+// shows) even though the underlying converted data was never wrong.
+const median = c => {
+  const n = c.length;
+  if (!n) return null;
+  const mid = Math.floor(n / 2);
+  return n % 2 ? c[mid] : (c[mid - 1] + c[mid]) / 2;
+};
 out.forEach(s => {
   const c = s.shots.map(x => x.carry).filter(v => v != null).sort((a, b) => a - b);
-  const m = c.length ? c[Math.floor(c.length / 2)] : null;
+  const m = median(c);
   console.log('  ' + (s.club.name + '        ').slice(0, 10) + (m != null ? Math.round(m * M_TO_YD) + ' yd' : '-'));
 });
