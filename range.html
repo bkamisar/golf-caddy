@@ -1141,6 +1141,16 @@ const load = () => composeDataset(baseline, loadStaging(), loadTombstones());
 // Anything newly entered goes to staging; the baseline only changes on save+push.
 const save = cs => saveStaging(cs);
 
+// Recommendations follow the same baseline+staging shape as sessions: the
+// committed file is the durable copy, localStorage holds only what has not
+// been saved and pushed yet.
+const LS_REC = 'golfcaddy_recs';
+const REC_URL = 'data/recommendations.json';
+let recBaseline = [];
+const loadRecStaging = () => { try { return JSON.parse(localStorage.getItem(LS_REC)) || []; } catch (e) { return []; } };
+const saveRecStaging = rs => localStorage.setItem(LS_REC, JSON.stringify(rs));
+const loadRecs = () => mergeRecommendations(recBaseline, loadRecStaging());
+
 // Rebuilt every render(); doDeleteSession(i) looks up the real date/club by
 // index rather than embedding those strings into an onclick="..." attribute —
 // club names can be arbitrary raw pasted text (an unrecognized club falls back
@@ -1242,7 +1252,8 @@ function render() {
   const groups = groupByClub(clubSessions);
   const gaps = computeGapping(groups);
   const verdicts = computeVerdicts(groups, gaps, []);
-  const prompt = coachPrompt(gaps, verdicts, groups, chosen);
+  const openRec = lastRecommendation(loadRecs(), ['range', 'video']);
+  const prompt = coachPrompt(gaps, verdicts, groups, chosen, openRec);
 
   savedSessionRows = computeSavedSessionRows(groups);
   const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
@@ -1415,6 +1426,10 @@ function bootstrap() {
     .then(r => r.ok ? r.json() : [])
     .then(d => { baseline = Array.isArray(d) ? d : []; })
     .catch(() => { baseline = []; })
+    .then(() => fetch(REC_URL, { cache: 'no-store' }))
+    .then(r => r.ok ? r.json() : [])
+    .then(d => { recBaseline = Array.isArray(d) ? d : []; })
+    .catch(() => { recBaseline = []; })
     .then(() => {
       populateClubOverride();
       document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
