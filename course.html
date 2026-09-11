@@ -127,7 +127,7 @@
     </div>
   </div>
   <div class="sub" style="text-transform:none;letter-spacing:0;margin-bottom:12px;display:none">
-    Numbers from <select id="sourcePick" onchange="render()" style="margin-left:4px"></select>
+    Numbers from <select id="sourcePick" onchange="userChosenSource=this.value;render()" style="margin-left:4px"></select>
   </div>
   <div id="view"></div>
   <div class="foot">
@@ -1023,11 +1023,20 @@ const load = () => composeDataset(baseline, loadStaging(), loadTombstones());
 const save = cs => saveStaging(cs);
 function msg(t) { document.getElementById('msg').textContent = t; }
 
+// Tracks a REAL user click on the source picker, separate from sel.value.
+// Reading sel.value alone doesn't work: rendering a rebuilt <select> with an
+// auto-picked <option selected> also sets .value, so on the NEXT render that
+// auto-pick looks identical to a deliberate user choice and gets stuck —
+// silently freezing the ladder on stale data even after a more recent
+// session (from a different launch monitor) arrives. Only the onchange
+// handler below may set this.
+let userChosenSource = null;
+
 function render() {
   const allSessions = load();
   const present = [...new Set(allSessions.map(cs => healSession(cs).source))].sort();
   const sel = document.getElementById('sourcePick');
-  const chosen = (sel && sel.value && present.indexOf(sel.value) >= 0) ? sel.value : preferredSource(allSessions);
+  const chosen = (userChosenSource && present.indexOf(userChosenSource) >= 0) ? userChosenSource : preferredSource(allSessions);
   if (sel) {
     sel.parentElement.style.display = present.length > 1 ? '' : 'none';
     sel.innerHTML = present.map(s => `<option value="${esc(s)}"${s === chosen ? ' selected' : ''}>${esc(s)}</option>`).join('');
