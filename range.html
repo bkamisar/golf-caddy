@@ -581,7 +581,13 @@ function mergeClubSessions(existing, incoming) {
   // stale stored name (see healSession above) would otherwise merge/dedup
   // against the wrong bucket, or split one real club into two rows, whenever
   // either side wasn't already healed before being passed in here.
-  const key = cs => `${cs.date}|${canonicalClub(normalizeClubCode(cs.clubCode)).name}`;
+  // Identity is date + club + source. Toptracer reads 12-20% hotter on ball
+  // speed than Trackman (measured across this project's own two sessions), so
+  // merging a Trackman and a Toptracer session of the same club on the same day
+  // would average two different instruments into one number. healSession
+  // normalizes a missing source to 'unknown' so legacy untagged sessions get
+  // their own bucket rather than silently absorbing newly-tagged data.
+  const key = cs => `${cs.date}|${canonicalClub(normalizeClubCode(cs.clubCode)).name}|${healSession(cs).source}`;
   const map = {};
   existing.forEach(cs => { map[key(cs)] = { ...cs, shots: [...cs.shots], tags: { ...cs.tags } }; });
   let addedShots = 0;
@@ -827,7 +833,7 @@ function computeSavedSessionRows(groups) {
       const total = sess.shots.length;
       const clean = sess.shots.filter(s => !s.quarantined).length;
       rows.push({
-        date: sess.date, clubName: g.name, clean, total,
+        date: sess.date, clubName: g.name, source: sess.source || 'unknown', clean, total,
         mishitRate: total ? Math.round((1 - clean / total) * 100) : null,
       });
     });
@@ -928,8 +934,11 @@ let savedSessionRows = [];
 function doDeleteSession(i) {
   const row = savedSessionRows[i];
   if (!row) return;
-  if (!confirm(`Delete ${row.clubName} on ${row.date}? This removes ${row.total} shot(s).`)) return;
-  save(load().filter(cs => !(cs.date === row.date && cs.club.name === row.clubName)));
+  if (!confirm(`Delete ${row.clubName} (${row.source}) on ${row.date}? This removes ${row.total} shot(s).`)) return;
+  save(load().filter(cs => {
+    const h = healSession(cs);
+    return !(cs.date === row.date && h.club.name === row.clubName && h.source === row.source);
+  }));
   msg(`Deleted ${row.clubName} (${row.date}).`);
   render();
 }

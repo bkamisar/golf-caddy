@@ -732,4 +732,25 @@ chk('T38 healSession preserves an explicit source',
 chk('T38 healSession rejects an unrecognized source as "unknown"',
   healSession({ date: '2026-08-01', clubCode: '7i', club: canonicalClub('7i'), source: 'nonsense', tags: {}, shots: [] }).source === 'unknown');
 
+// T39. Identity is date + club + source.
+const srcShots = n => Array.from({ length: n }, () => ({ clubSpeed: 30, attackAngle: 0, ballSpeed: 40, spin: 6000, carry: 110, side: -3 }));
+const tmSess = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source: 'trackman', tags: {}, shots: srcShots(6) };
+const ttSess = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), source: 'toptracer', tags: {}, shots: srcShots(6) };
+
+chk('T39 same club+date from two sources stays two club-sessions', mergeClubSessions([tmSess], [ttSess]).all.length === 2);
+chk('T39 same club+date+source still merges into one', mergeClubSessions([tmSess], [{ ...tmSess }]).all.length === 1);
+chk('T39 merging identical input twice is idempotent', (() => {
+  const once = mergeClubSessions([], [tmSess, ttSess]).all;
+  const twice = mergeClubSessions(once, [tmSess, ttSess]);
+  return twice.all.length === 2 && twice.addedShots === 0;
+})());
+chk('T39 an untagged legacy session does not collide with a tagged one', (() => {
+  const legacy = { date: '2026-08-01', dateAssumed: false, clubCode: '7i', club: canonicalClub('7i'), tags: {}, shots: srcShots(6) };
+  return mergeClubSessions([legacy], [tmSess]).all.length === 2;
+})());
+chk('T39 saved-session rows expose the source', (() => {
+  const rows = computeSavedSessionRows(groupByClub([tmSess, ttSess]));
+  return rows.length === 2 && rows.some(r => r.source === 'trackman') && rows.some(r => r.source === 'toptracer');
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
