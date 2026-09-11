@@ -484,23 +484,41 @@ function roundConfounds(m) {
 }
 
 // ── Coach debrief prompt (paste into Claude) ─────────────────────────────────
-function coachPrompt(m) {
+function coachPrompt(m, lastRec) {
   const l5 = m.full.slice(-5);
   const rows = l5.map(r =>
-    `${r.date} ${r.course}: score ${r.score}, diff ${r.diff}` +
+    `${r.date} ${r.course} (rating ${r.rating != null ? r.rating : 'n/a'}, slope ${r.slope != null ? r.slope : 'n/a'}): score ${r.score}, diff ${r.diff}` +
     (r.putts != null ? `, putts ${r.putts}` : '') +
     (r.gir !== null ? `, GIR ${r.gir}%` : '') + (r.fir !== null ? `, FIR ${r.fir}%` : '')).join('\n');
-  return `You are my team of four golf coaches. Stay in character, disagree where your philosophies differ, and ground EVERYTHING in my data below — no generic tips.
-- FALDO (swing mechanics): tempo, fundamentals, repeatability.
-- BRYSON (data): ruthlessly quantitative, calls out what the numbers do and don't support.
-- FAXON (putting): stroke, green reading, speed.
-- PHIL (short game): chipping, pitching, scrambling — and gambler's course management.
+  const confounds = roundConfounds(m);
+  const priorLine = lastRec
+    ? `${lastRec.priority} (success criterion: ${lastRec.criterion}, set ${lastRec.date})`
+    : 'none on record';
 
-MY DATA (from my Grint analyzer, ${m.n} eighteen-hole rounds):
+  return `You are my golf performance analyst. Give me one clear, prioritized breakdown. No personas, no debate format, no conversation. Ground every claim in the specific numbers below, and do not offer generic golf advice that is not tied to something in this data.
+
+I am still learning golf terminology — define any term that is not obvious (GIR, scrambling, differential, bogey-golfer baseline) the first time you use it.
+
+BEFORE YOU ANALYZE — rules about being honest with this data:
+- Sample sizes are small. Where a difference could plausibly be normal variation round to round, say so instead of building a story on it.
+- Read the CONFOUNDS block and factor it in. If a confound explains a trend, say that rather than crediting my swing.
+- If a metric fuses two different skills, do not guess which one is the problem. Say so, and name what data would separate them.
+- If a section is not supported by the data, write "not enough data" for it. Do not invent a finding so that every section has content.
+
+Structure your response exactly as:
+
+1. CONTINUITY CHECK — My last priority was: ${priorLine}. Did I meet it? Answer met, not met, or not enough data, and say which numbers show it.
+2. TREND CHECK — Is my recent trend real improvement or noise? Compare recent rounds to the career baseline, account for the confounds, and state how confident you are.
+3. WHAT IS IMPROVING — The specific stat or stats showing real gains, and what part of my game that reflects.
+4. WHAT IS NOT IMPROVING — The stats that are flat or still weak despite the trend, with strokes-per-round impact where the data supports it.
+5. BIGGEST LEAK — The single largest strokes-per-round leak, explained plainly. If that metric fuses two skills, say so and name what would separate them.
+6. ONE PRIORITY — One specific drill for my next practice session with a numeric success criterion (for example "8 of 10 balls within 6 feet"), tied to the biggest leak. If the biggest leak is ambiguous, pick the priority that would DIAGNOSE it rather than guessing at a fix.
+
+MY DATA (${m.n} eighteen-hole rounds with a differential):
 - Median differential ${r1(m.medDiff)} (good-day 20th pct ${r1(m.ceiling)}, blow-up 80th pct ${r1(m.floor)})
 - Last-5 median ${r1(m.last5Med)}${m.priorMed !== null ? ` vs ${r1(m.priorMed)} prior baseline` : ''}
-- ${m.recentEliteCt} of last ${m.recentEliteN} rounds in my career-best decile (≤ ${r1(m.bestDecileCut)})
-${m.puttsAll !== null ? `- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5.${m.pveAll !== null ? ` Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round` : ' (No GIR data, so putts can\'t be separated from chip proximity.)'}` : '- (No putts data in this export.)'}
+- ${m.recentEliteCt} of last ${m.recentEliteN} rounds in my career-best decile (diff at or below ${r1(m.bestDecileCut)})
+${m.puttsAll !== null ? `- Putts/hole: ${r1(m.puttsAll)} career, ${r1(m.putts5)} last-5.${m.pveAll !== null ? ` Putts vs bogey-golfer expectation given my GIR: +${r1(m.pveAll * 18)}/round` : ' (No GIR data, so putting cannot be separated from chip proximity.)'}` : '- (No putts data in this export.)'}
 ${m.longAll !== null ? `- Long game (score minus putts)/hole: ${r1(m.longAll)} career, ${r1(m.long5)} last-5` : ''}
 - GIR ${m.girAll !== null ? Math.round(m.girAll) + '%' : 'n/a'}, FIR ${m.firAll !== null ? Math.round(m.firAll) + '%' : 'n/a'}
 - Ranked leaks (strokes/round): ${m.leaks.map(x => `${x.label} ${r1(x.strokes)}`).join(' · ')}
@@ -508,7 +526,8 @@ ${m.longAll !== null ? `- Long game (score minus putts)/hole: ${r1(m.longAll)} c
 LAST 5 ROUNDS:
 ${rows}
 
-Debrief my recent play as a conversation between the four of you: what's real in the recent trend, what's noise, where you disagree, and end with ONE practice priority each (a specific drill with success criteria), then a consensus pick for the single most valuable thing before my next round.`;
+CONFOUNDS IN THIS SAMPLE:
+${confounds.length ? confounds.map(c => '- ' + c).join('\n') : '- (none identified)'}`;
 }
 /*ENGINE-END*/
 

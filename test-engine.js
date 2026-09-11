@@ -183,4 +183,32 @@ chk('A10 returns plain strings with no HTML', (() => {
   return Array.isArray(c) && c.every(x => typeof x === 'string' && !/[<>]/.test(x));
 })());
 
+// A11. The rewritten rounds prompt, structured to the contract the user
+// approved: continuity, trend, improving, not improving, biggest leak, one
+// priority — with an explicit instruction not to guess which skill a fused
+// metric implicates.
+const A11rounds = [
+  mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+  mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+  mkR('2026-09-05','C',129,99,44,17,62),
+];
+const A11m = computeMetrics(A11rounds);
+const PA11 = coachPrompt(A11m);
+
+chk('A11 no personas remain', !/FALDO|BRYSON|FAXON|PHIL/i.test(PA11));
+chk('A11 no conversational-debrief framing remains', !/conversation between|disagree where/i.test(PA11));
+chk('A11 all six sections present', ['CONTINUITY CHECK','TREND CHECK','WHAT IS IMPROVING','WHAT IS NOT IMPROVING','BIGGEST LEAK','ONE PRIORITY']
+  .every(h => PA11.includes(h)));
+chk('A11 carries the honesty rules', /could plausibly be normal variation/i.test(PA11) && /not enough data/i.test(PA11));
+chk('A11 instructs that a fused metric must not be guessed apart', /fuses two|two different skills/i.test(PA11));
+chk('A11 demands a numeric success criterion', /numeric success criterion/i.test(PA11));
+chk('A11 asks for plain-language definitions', /define any term/i.test(PA11));
+chk('A11 includes a confounds block', /CONFOUNDS/.test(PA11));
+chk('A11 continuity degrades to none on record', /none on record/i.test(PA11));
+chk('A11 echoes a prior recommendation when supplied', (() => {
+  const prior = { date: '2026-08-01', priority: 'Lag putting from 30 feet', criterion: '7 of 10 inside 3 feet' };
+  return coachPrompt(A11m, prior).includes('Lag putting from 30 feet');
+})());
+chk('A11 no leftover HTML tags', !/<\/?b>/.test(PA11));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
