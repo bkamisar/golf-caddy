@@ -435,6 +435,54 @@ function computeMetrics(rounds) {
   return m;
 }
 
+// Conditions that could explain a differential move without any change in
+// skill. The course-mix check reuses slope5/slopeAll, which already drives an
+// on-page caveat verdict above a 6-point gap; here the threshold is lower and
+// the number is always stated, because the model needs the magnitude even
+// when it is not large enough to be worth interrupting the user about. Note
+// the differential formula already adjusts for slope (a harder course gives a
+// BETTER differential for the same score), so this confound is phrased as
+// affecting the raw putts/GIR/FIR stats, not the differential itself.
+function roundConfounds(m) {
+  const out = [];
+  const l5 = (m.full || []).slice(-5);
+  out.push(`All "last-5" comparisons below rest on ${l5.length} round(s) against a career corpus of ${m.n}. Five rounds is a small sample for any claim about a trend.`);
+
+  const dates = l5.map(r => r.date).filter(Boolean).sort();
+  let maxGap = 0, gapFrom = null, gapTo = null;
+  for (let i = 1; i < dates.length; i++) {
+    const days = Math.round((new Date(dates[i]) - new Date(dates[i - 1])) / 86400000);
+    if (days > maxGap) { maxGap = days; gapFrom = dates[i - 1]; gapTo = dates[i]; }
+  }
+  if (maxGap >= 21) {
+    out.push(`These rounds are not consecutive play: there is a ${Math.round(maxGap / 7)}-week gap between ${gapFrom} and ${gapTo}. Rounds either side of a layoff are not directly comparable.`);
+  }
+
+  if (m.slope5 != null && m.slopeAll != null && Math.abs(m.slope5 - m.slopeAll) >= 3) {
+    const harder = m.slope5 > m.slopeAll;
+    out.push(`My last 5 rounds averaged slope ${Math.round(m.slope5)} against a career average of ${Math.round(m.slopeAll)} — ${harder ? 'harder' : 'easier'} courses than usual. The differential adjusts for this, but raw putts, GIR and FIR trends do not.`);
+  }
+
+  const courses = [...new Set(l5.map(r => r.course).filter(Boolean))];
+  if (courses.length > 1) {
+    out.push(`Those 5 rounds span ${courses.length} different courses, so raw per-round stats partly reflect where I played.`);
+  }
+
+  const missing = [];
+  if (l5.some(r => r.gir == null)) missing.push('GIR');
+  if (l5.some(r => r.fir == null)) missing.push('FIR');
+  if (l5.some(r => r.putts == null)) missing.push('putts');
+  if (missing.length) {
+    out.push(`At least one of the last 5 rounds is missing ${missing.join(' / ')}, so any average over that window is computed from fewer than 5 rounds.`);
+  }
+
+  const partial = (m.all || []).filter(r => r.holes !== 18 && r.holes >= 9).length;
+  if (partial) {
+    out.push(`${partial} round(s) in the component stats were not full 18s. Their per-hole rates are valid and included; their differentials are not, and are excluded.`);
+  }
+  return out;
+}
+
 // ── Coach debrief prompt (paste into Claude) ─────────────────────────────────
 function coachPrompt(m) {
   const l5 = m.full.slice(-5);

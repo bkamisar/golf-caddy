@@ -131,4 +131,56 @@ chk('A9 putts/hole is computed off actual holes played, not assumed 18', (() => 
   return Math.abs(short.puttsPH - 32 / 13) < 1e-9;
 })());
 
+// A10. Round confounds. The real sample that motivated this: five rounds
+// spanning a seven-week layoff across three courses at a higher average slope
+// than career, presented to the model as a clean nine-stroke improvement.
+const mkR = (date, course, slope, score, putts, gir, fir, holes) => ({
+  date, course, rating: 68.2, slope, score, holes: holes || 18, putts,
+  gir, fir, diff: Math.round((score - 68.2) * 113 / slope * 10) / 10,
+});
+
+chk('A10 flags a long layoff inside the comparison window', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,null,62),
+    mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+    mkR('2026-09-05','C',129,99,44,17,62),
+  ];
+  return roundConfounds(computeMetrics(rounds)).some(x => /gap|layoff|weeks/i.test(x));
+})());
+chk('A10 flags a course-difficulty shift', (() => {
+  const rounds = [
+    mkR('2026-01-01','A',110,105,44,12,60), mkR('2026-01-08','A',110,104,44,12,60),
+    mkR('2026-01-15','A',110,103,44,12,60), mkR('2026-01-22','A',110,106,44,12,60),
+    mkR('2026-02-01','H',140,102,43,13,61), mkR('2026-02-08','H',140,101,43,13,61),
+    mkR('2026-02-15','H',140,100,43,13,61), mkR('2026-02-22','H',140,102,43,13,61),
+    mkR('2026-03-01','H',140,99,42,14,62),
+  ];
+  return roundConfounds(computeMetrics(rounds)).some(x => /slope|course/i.test(x));
+})());
+chk('A10 flags rounds missing a component field', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,null,62),
+    mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+    mkR('2026-08-05','C',123,99,44,17,62),
+  ];
+  return roundConfounds(computeMetrics(rounds)).some(x => /GIR|missing/i.test(x));
+})());
+chk('A10 states the sample size', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+    mkR('2026-08-05','C',123,99,44,17,62),
+  ];
+  return roundConfounds(computeMetrics(rounds)).some(x => /last-5|5 rounds|sample/i.test(x));
+})());
+chk('A10 returns plain strings with no HTML', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+    mkR('2026-08-05','C',123,99,44,17,62),
+  ];
+  const c = roundConfounds(computeMetrics(rounds));
+  return Array.isArray(c) && c.every(x => typeof x === 'string' && !/[<>]/.test(x));
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
