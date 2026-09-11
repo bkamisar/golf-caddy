@@ -126,4 +126,23 @@ chk('C7 the mirrored coachPrompt carries no personas', (() => {
   return !/FALDO|BRYSON/i.test(p) && p.includes('ONE PRIORITY');
 })());
 
+// C8. Phase 2b engine mirrored into course.html's own copy. The page does not
+// use any of it — it shows no findings and logs no priorities — but the shared
+// block stays identical so a future engine fix is one splice, not a merge.
+chk('C8 recommendations engine present', typeof recKey === 'function'
+  && typeof mergeRecommendations === 'function' && typeof lastRecommendation === 'function'
+  && typeof closePending === 'function');
+chk('C8 findings engine present', typeof isKnownFinding === 'function'
+  && typeof angleSupports === 'function' && typeof gradeFinding === 'function'
+  && typeof findingsForPrompt === 'function');
+chk('C8 the taxonomy mirrored intact', isKnownFinding('early-extension')
+  && !isKnownFinding('nonsense-key')
+  && angleSupports('swing-plane', 'down-the-line') === true
+  && angleSupports('swing-plane', 'front-on') === false);
+chk('C8 lastRecommendation behaves identically here', (() => {
+  const r = { date: '2026-09-01', source: 'range', priority: 'p', criterion: 'c', outcome: 'pending' };
+  return lastRecommendation([r], ['range', 'video']).priority === 'p'
+    && lastRecommendation([r], ['round']) === null;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
