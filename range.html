@@ -146,7 +146,7 @@
 
   <div class="sec" id="filterbar" style="padding-bottom:0;border-bottom:0">
     <label class="sub" style="text-transform:none;letter-spacing:0">Launch monitor:
-      <select id="sourceFilter" onchange="render()" style="margin-left:6px"></select>
+      <select id="sourceFilter" onchange="userChosenSource=this.value;render()" style="margin-left:6px"></select>
     </label>
   </div>
   <div id="dash"></div>
@@ -246,6 +246,21 @@ function healSession(cs) {
 }
 function healClubSessions(clubSessions) {
   return (clubSessions || []).map(healSession);
+}
+
+// Which single source to show: the one with the most recent session. Never a
+// blend — the two instruments differ by 12-20% on the same swing (measured on
+// this project's real data: 7-iron 121 yds on Trackman vs 139 on Toptracer).
+// Pooling their shots produces a median that lands wherever the shot-count
+// ratio happens to put it, which is arbitrary per club and matches neither
+// instrument, so no caller is offered an "all sources" option.
+function preferredSource(clubSessions) {
+  let best = null, bestDate = '';
+  (clubSessions || []).forEach(cs => {
+    const s = healSession(cs);
+    if (cs.date > bestDate) { bestDate = cs.date; best = s.source; }
+  });
+  return best;
 }
 
 // Escape any string that came from a paste before it touches innerHTML.
@@ -1014,6 +1029,12 @@ const save = cs => saveStaging(cs);
 // into a JS string literal nested inside an HTML attribute (HTML-entity
 // decoding happens before the JS is parsed, so an escaped quote there still
 // closes the string). A plain integer index has no such risk.
+// Null until the user actively picks a source from the dropdown; render() then
+// falls back to preferredSource(). Only the onchange handler may set this — if
+// render() wrote to it, a one-off default would harden into a sticky filter
+// that silently hides every session from a newly added launch monitor.
+let userChosenSource = null;
+
 let savedSessionRows = [];
 function doDeleteSession(i) {
   const row = savedSessionRows[i];
@@ -1082,14 +1103,18 @@ function spark(vals, invert) {
 
 function render() {
   const allSessions = load();
-  const present = [...new Set(allSessions.map(cs => cs.source || 'unknown'))].sort();
+  const present = [...new Set(allSessions.map(cs => healSession(cs).source))].sort();
   const sel = document.getElementById('sourceFilter');
-  const want = sel.value || 'all';
-  sel.innerHTML = '<option value="all">All sources</option>' +
-    present.map(s => `<option value="${esc(s)}"${s === want ? ' selected' : ''}>${esc(s)}</option>`).join('');
-  if (want !== 'all' && present.indexOf(want) < 0) sel.value = 'all';
-  const clubSessions = sel.value === 'all' ? allSessions
-    : allSessions.filter(cs => (cs.source || 'unknown') === sel.value);
+  // One source at a time, never pooled. `userChosenSource` is only ever set by
+  // the onchange handler, so a source that disappears (its last session
+  // deleted) falls back to preferredSource instead of freezing the view on a
+  // filter that now matches nothing.
+  const chosen = (userChosenSource && present.indexOf(userChosenSource) >= 0)
+    ? userChosenSource : preferredSource(allSessions);
+  sel.parentElement.style.display = present.length > 1 ? '' : 'none';
+  sel.innerHTML = present.map(s =>
+    `<option value="${esc(s)}"${s === chosen ? ' selected' : ''}>${esc(s)}</option>`).join('');
+  const clubSessions = allSessions.filter(cs => healSession(cs).source === chosen);
   const dash = document.getElementById('dash');
   if (!clubSessions.length) {
     dash.innerHTML = '<div class="sec"><h2>No sessions yet</h2><div class="note"><span class="dot"></span><span class="txt">Paste your Trackman club table above to get started.</span></div></div>';

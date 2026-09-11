@@ -842,4 +842,52 @@ chk('T42 composeDataset heals stale club identity from the baseline', (() => {
 })());
 chk('T42 composeDataset tolerates a null baseline', composeDataset(null, [tsA], []).length === 1);
 
+// T37. Sources are never pooled. Bug found on the live site: range.html
+// defaulted to an "All sources" view that ran computeGapping over both
+// instruments' shots at once. The result was a median that landed wherever the
+// shot-count ratio put it — 7-Iron showed 127 yds when Trackman said 121 and
+// Toptracer said 139, matching neither, and leaning a different direction per
+// club. preferredSource picks exactly one, and no caller may blend.
+const poolTm = (date, code, carryM) => ({
+  date, dateAssumed: false, clubCode: code, club: canonicalClub(code),
+  source: 'trackman', tags: {},
+  shots: Array.from({ length: 8 }, (_, i) => ({
+    clubSpeed: 33, attackAngle: 2, ballSpeed: 43, spin: 5400,
+    carry: carryM + i * 0.1, side: 2,
+  })),
+});
+const poolTt = (date, code, carryM) => ({ ...poolTm(date, code, carryM), source: 'toptracer' });
+
+chk('T37 preferredSource picks the most recent session\'s source', (() => {
+  return preferredSource([poolTm('2026-08-22', '7i', 108), poolTt('2026-09-11', '7i', 125)]) === 'toptracer';
+})());
+chk('T37 preferredSource is unaffected by session ordering in the array', (() => {
+  return preferredSource([poolTt('2026-09-11', '7i', 125), poolTm('2026-08-22', '7i', 108)]) === 'toptracer';
+})());
+chk('T37 preferredSource on a single-source bag returns that source', (() => {
+  return preferredSource([poolTm('2026-08-22', '7i', 108)]) === 'trackman';
+})());
+chk('T37 preferredSource on empty input returns null, does not throw', preferredSource([]) === null);
+chk('T37 an untagged legacy session heals to "unknown" rather than undefined', (() => {
+  const legacy = { date: '2026-01-01', clubCode: '7i', club: canonicalClub('7i'), tags: {}, shots: [] };
+  return preferredSource([legacy]) === 'unknown';
+})());
+
+chk('T37 filtering to one source reproduces that source\'s own carry exactly', (() => {
+  const mixed = [poolTm('2026-08-22', '7i', 108), poolTt('2026-09-11', '7i', 125)];
+  const tmOnly = mixed.filter(cs => healSession(cs).source === 'trackman');
+  const soloCarry = computeGapping(groupByClub([poolTm('2026-08-22', '7i', 108)]))[0].cleanCarryYd;
+  const filteredCarry = computeGapping(groupByClub(tmOnly))[0].cleanCarryYd;
+  return Math.abs(soloCarry - filteredCarry) < 1e-9;
+})());
+
+chk('T37 pooling both sources would land between them — which is why it is not offered', (() => {
+  const mixed = [poolTm('2026-08-22', '7i', 108), poolTt('2026-09-11', '7i', 125)];
+  const tm = computeGapping(groupByClub(mixed.filter(c => healSession(c).source === 'trackman')))[0].cleanCarryYd;
+  const tt = computeGapping(groupByClub(mixed.filter(c => healSession(c).source === 'toptracer')))[0].cleanCarryYd;
+  const pooled = computeGapping(groupByClub(mixed))[0].cleanCarryYd;
+  // Guards the premise of this whole fix: the blend genuinely matches neither.
+  return pooled > tm + 1 && pooled < tt - 1;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

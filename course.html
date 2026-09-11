@@ -234,6 +234,21 @@ function healClubSessions(clubSessions) {
   return (clubSessions || []).map(healSession);
 }
 
+// Which single source to show: the one with the most recent session. Never a
+// blend — the two instruments differ by 12-20% on the same swing (measured on
+// this project's real data: 7-iron 121 yds on Trackman vs 139 on Toptracer).
+// Pooling their shots produces a median that lands wherever the shot-count
+// ratio happens to put it, which is arbitrary per club and matches neither
+// instrument, so no caller is offered an "all sources" option.
+function preferredSource(clubSessions) {
+  let best = null, bestDate = '';
+  (clubSessions || []).forEach(cs => {
+    const s = healSession(cs);
+    if (cs.date > bestDate) { bestDate = cs.date; best = s.source; }
+  });
+  return best;
+}
+
 // Escape any string that came from a paste before it touches innerHTML.
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -993,17 +1008,6 @@ function ladderRows(gaps) {
   }));
 }
 
-// Which single source to show: the one with the most recent session. Never a
-// blend — the two instruments differ by 12-20% on the same swing (measured on
-// this project's real data).
-function preferredSource(clubSessions) {
-  let best = null, bestDate = '';
-  (clubSessions || []).forEach(cs => {
-    const s = healSession(cs);
-    if (cs.date > bestDate) { bestDate = cs.date; best = s.source; }
-  });
-  return best;
-}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
