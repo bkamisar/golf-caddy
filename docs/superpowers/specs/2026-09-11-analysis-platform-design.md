@@ -216,9 +216,23 @@ the tool, supported by:
   extraction will occasionally misread a digit, and a silently wrong 7 poisons
   every rollup built on it.
 
-**Schema is deliberately minimal** — par, score, putts, GIR, FIR per hole.
-Driving-miss severity and penalty flags are deferred: they depend on recalling
-how bad a miss was after the fact, which is unreliable and self-serving.
+**Schema** — per hole: par, score, putts, GIR (with miss type), FIR, tee club,
+and drive-miss direction/severity.
+
+Driving-miss severity was originally deferred here on the grounds that it
+depends on unreliable after-the-fact recall. **Screenshots reviewed 2026-09-11
+show that was wrong** — Grint records it natively, as directional arrow glyphs
+distinguishing a normal miss from a severe one, alongside the tee club used on
+every hole. It is recorded, not recalled, so it is in scope.
+
+Grint also renders a **DISTANCE (ft)** row, empty in the sample round. If that
+captures first-putt distance, it is the single most valuable field available
+here: it splits the current top leak ("putting + chip proximity," 8.3
+strokes/round) cleanly, because long first putts following a greenside miss
+indict chipping rather than putting. Worth confirming what populates it and
+whether it is worth entering going forward.
+
+Penalty capture remains deferred pending clarification — see open questions.
 
 **Rollups unlocked:** putts after a green hit vs putts after a miss (the
 compounding-vs-standalone split that separates putting from chipping);
@@ -279,13 +293,20 @@ extraction is deterministic run to run.
 
 ## Open questions
 
-1. Does the Grint scorecard screenshot reliably show putts per hole, or only
-   score per hole? Putts-per-hole is what unlocks the compounding-vs-standalone
-   split — if it is unavailable, Phase 3's value drops substantially and the
-   phase should be reconsidered.
-2. Does `course.html` need findings and the current priority on the phone, or
+1. ~~Does the Grint scorecard show putts per hole?~~ **Resolved 2026-09-11** —
+   yes, and considerably more: par, score, putts, GIR with miss type, driving
+   accuracy with miss direction and severity, and tee club, all per hole.
+   Phase 3 is well-supported. A sample extraction is checked in at
+   `data/hole-detail/2026-09-05-pinehurst-10.json`.
+2. What populates Grint's **DISTANCE (ft)** row, and is it first-putt distance?
+   If so it unfuses the biggest leak and is worth entering going forward.
+3. Grint's **PENALTIES** row is mixed-use — it carries lie codes (`S` =
+   greenside bunker) alongside penalty counts, and the sample round totals
+   `0.5` rather than a whole number. Resolve these semantics before any rollup
+   consumes penalties.
+4. Does `course.html` need findings and the current priority on the phone, or
    is the yardage ladder still the whole job on-course?
-3. Should `index.html` (rounds) and `range.html` (shots) share one
+5. Should `index.html` (rounds) and `range.html` (shots) share one
    recommendations view, or does each show only its own source?
 
 ## Testing
