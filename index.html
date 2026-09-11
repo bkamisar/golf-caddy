@@ -124,7 +124,7 @@
     </select>
     <textarea id="paste" placeholder="The Grint: Stats → Scores → select the whole table → copy → paste. Other apps: export/copy a table WITH a header row (needs at least Date + Score columns; Rating+Slope or a Differential column enable the handicap trend). Re-pasting is safe — duplicates merge."></textarea>
     <button onclick="doParse()">Parse &amp; save</button>
-    <button class="ghost" onclick="doExport()">Export JSON</button>
+    <button class="ghost" onclick="doSaveToFile()">Save to data file</button>
     <button class="ghost" onclick="document.getElementById('imp').click()">Import</button>
     <button class="ghost" onclick="doClear()">Clear all</button>
     <input type="file" id="imp" style="display:none" onchange="doImport(event)">
@@ -457,8 +457,15 @@ Debrief my recent play as a conversation between the four of you: what's real in
 
 // ── UI ───────────────────────────────────────────────────────────────────────
 const LS = 'golfcaddy_rounds';
-const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
-const save = r => localStorage.setItem(LS, JSON.stringify(r));
+const DATA_URL = 'data/rounds.json';
+
+let baseline = [];   // populated by the bootstrap at the end of this script
+
+const loadStaging = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
+const saveStaging = rs => localStorage.setItem(LS, JSON.stringify(rs));
+// .all — mergeRounds returns {all, added}, and every caller of load() wants the array.
+const load = () => mergeRounds(baseline, loadStaging()).all;
+const save = rs => saveStaging(rs);
 // Escape any string that came from the paste before it touches innerHTML.
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -528,17 +535,35 @@ function doParse() {
   document.getElementById('paste').value = '';
   render();
 }
-function doExport() {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(load(), null, 1)], { type: 'application/json' }));
-  a.download = 'golf-rounds.json'; a.click();
-}
 function doImport(ev) {
   const f = ev.target.files[0]; if (!f) return;
   f.text().then(t => { const { all, added } = mergeRounds(load(), JSON.parse(t)); save(all); msg(`Imported ${added} new rounds.`); render(); });
 }
 function doClear() { if (confirm('Delete all stored rounds?')) { localStorage.removeItem(LS); render(); } }
-render();
+
+function doSaveToFile() {
+  const json = JSON.stringify(load(), null, 1);
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: 'rounds.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+    }).then(handle => handle.createWritable())
+      .then(w => w.write(json).then(() => w.close()))
+      .then(() => msg('Saved. Commit and push in GitHub Desktop.'))
+      .catch(e => { if (e && e.name !== 'AbortError') msg('Save failed — use the download fallback.'); });
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = 'rounds.json'; a.click();
+  msg('Downloaded. Save it over data/rounds.json, then commit and push.');
+}
+
+fetch(DATA_URL, { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : [])
+  .then(d => { baseline = Array.isArray(d) ? d : []; })
+  .catch(() => { baseline = []; })
+  .then(render);
 </script>
 </body>
 </html>
