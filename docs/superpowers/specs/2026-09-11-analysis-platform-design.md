@@ -225,12 +225,39 @@ show that was wrong** — Grint records it natively, as directional arrow glyphs
 distinguishing a normal miss from a severe one, alongside the tee club used on
 every hole. It is recorded, not recalled, so it is in scope.
 
-Grint also renders a **DISTANCE (ft)** row, empty in the sample round. If that
-captures first-putt distance, it is the single most valuable field available
-here: it splits the current top leak ("putting + chip proximity," 8.3
-strokes/round) cleanly, because long first putts following a greenside miss
-indict chipping rather than putting. Worth confirming what populates it and
-whether it is worth entering going forward.
+Grint's **DISTANCE (ft)** row is **first-putt distance** (confirmed
+2026-09-11). It was empty on the sample round; the user will record it going
+forward. This is the single most valuable field available here, because it
+splits the current top leak — "putting + chip proximity," 8.3 strokes/round —
+into its two component skills:
+
+- **Putting**, isolated: putts taken versus expected *for that distance*.
+  Three-putting from 40 feet is unremarkable; three-putting from 12 feet is a
+  putting problem. Round-level putts/hole cannot tell these apart.
+- **Short game**, isolated: first-putt distance following a green miss, versus
+  a baseline. Chips finishing 25 feet away produce "bad putting" numbers that
+  are actually a chipping failure.
+
+**Baseline choice matters and can mislead.** Expected-putts-by-distance curves
+are usually published for scratch or tour players; scoring a bogey-plus golfer
+against one makes putting look catastrophic regardless of true performance. The
+app already sets this precedent correctly elsewhere, using bogey-golfer norms
+(2.15 putts on greens hit, 1.95 after a miss) so low-GIR rounds are not
+miscounted as bad putting. The distance curve must be bogey-golfer calibrated
+for the same reason.
+
+**This creates a third data tier.** Rollups must not silently mix them:
+
+| Tier | Corpus | Supports |
+|---|---|---|
+| Round-level | All 31 rounds | Differential trend, career baselines |
+| Hole-level | Rounds with `holeDetail` | Blow-ups, compounding vs standalone, par-3 isolation |
+| Distance-aware | Rounds with first-putt distance (forward only) | True putting-vs-chipping split |
+
+Each tier reports its own sample size. The distance-aware tier starts empty and
+will be the smallest for some time, so its conclusions carry the weakest
+confidence and should be labeled accordingly rather than presented alongside
+31-round trends as equals.
 
 Penalty capture remains deferred pending clarification — see open questions.
 
@@ -298,8 +325,11 @@ extraction is deterministic run to run.
    accuracy with miss direction and severity, and tee club, all per hole.
    Phase 3 is well-supported. A sample extraction is checked in at
    `data/hole-detail/2026-09-05-pinehurst-10.json`.
-2. What populates Grint's **DISTANCE (ft)** row, and is it first-putt distance?
-   If so it unfuses the biggest leak and is worth entering going forward.
+2. ~~What populates Grint's DISTANCE (ft) row?~~ **Resolved 2026-09-11** — it
+   is first-putt distance, and will be recorded going forward. Remaining
+   sub-question: which bogey-golfer expected-putts-by-distance curve to use as
+   the baseline. Source it before Phase 3 implementation; a tour-calibrated
+   curve would systematically misrepresent putting performance.
 3. Grint's **PENALTIES** row is mixed-use — it carries lie codes (`S` =
    greenside bunker) alongside penalty counts, and the sample round totals
    `0.5` rather than a whole number. Resolve these semantics before any rollup
