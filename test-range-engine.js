@@ -1071,4 +1071,76 @@ chk('T46 closePending with nothing pending is a no-op', (() => {
 chk('T46 VALID_OUTCOMES covers the four states', ['pending','met','not-met','insufficient-data']
   .every(o => VALID_OUTCOMES.indexOf(o) >= 0));
 
+// T47. Findings are standing conditions, not dated events — which is why a
+// video session's date never has to line up with a range session's. The angle
+// gate encodes the lesson from the retracted driver claim: a front-on clip
+// cannot support a swing-plane assessment, so a finding recorded from one is
+// downgraded rather than trusted.
+const mkF = (over) => Object.assign({
+  id: 'f1', finding: 'early-extension', clubs: ['7-Iron'], assessment: 'fault',
+  confidence: 'measured', measurement: 'cap-top +4px address to impact',
+  cameraAngle: 'down-the-line', firstNoted: '2026-09-11', lastConfirmed: '2026-09-11',
+  status: 'open', note: '',
+}, over || {});
+
+chk('T47 the taxonomy is a fixed list, not free text', (() => {
+  return isKnownFinding('early-extension') && !isKnownFinding('feels-a-bit-off');
+})());
+chk('T47 every taxonomy entry declares a label and angle rule', (() => {
+  return Object.keys(FINDING_TAXONOMY).every(k => {
+    const t = FINDING_TAXONOMY[k];
+    return typeof t.label === 'string' && (t.angles === null || Array.isArray(t.angles));
+  });
+})());
+chk('T47 swing plane requires a down-the-line view', angleSupports('swing-plane', 'down-the-line') === true
+  && angleSupports('swing-plane', 'front-on') === false);
+chk('T47 weight transfer requires a front-on view', angleSupports('weight-transfer-quality', 'front-on') === true
+  && angleSupports('weight-transfer-quality', 'down-the-line') === false);
+chk('T47 an unrestricted finding accepts any angle', angleSupports('finish-balance', 'front-on') === true
+  && angleSupports('finish-balance', 'down-the-line') === true);
+chk('T47 an unknown angle never supports anything', angleSupports('swing-plane', null) === false);
+
+chk('T47 a finding from an unsupported angle is downgraded to speculative', (() => {
+  const f = gradeFinding(mkF({ finding: 'swing-plane', cameraAngle: 'front-on', confidence: 'measured' }));
+  return f.confidence === 'speculative' && /angle/i.test(f.confidenceNote);
+})());
+chk('T47 a finding from a supported angle keeps its stated confidence', (() => {
+  const f = gradeFinding(mkF({ finding: 'swing-plane', cameraAngle: 'down-the-line', confidence: 'measured' }));
+  return f.confidence === 'measured' && f.confidenceNote === null;
+})());
+chk('T47 gradeFinding does not mutate its input', (() => {
+  const src = mkF({ finding: 'swing-plane', cameraAngle: 'front-on', confidence: 'measured' });
+  gradeFinding(src);
+  return src.confidence === 'measured';
+})());
+
+chk('T47 merge keys on id and the newer lastConfirmed wins', (() => {
+  const a = mkF({ id: 'x', lastConfirmed: '2026-09-01', note: 'older' });
+  const b = mkF({ id: 'x', lastConfirmed: '2026-09-11', note: 'newer' });
+  const m = mergeFindings([a], [b]);
+  return m.length === 1 && m[0].note === 'newer';
+})());
+chk('T47 an older incoming record does not clobber a newer one', (() => {
+  const a = mkF({ id: 'x', lastConfirmed: '2026-09-11', note: 'newer' });
+  const b = mkF({ id: 'x', lastConfirmed: '2026-09-01', note: 'older' });
+  return mergeFindings([a], [b])[0].note === 'newer';
+})());
+chk('T47 openFindings excludes resolved ones', (() => {
+  const list = [mkF({ id: 'a' }), mkF({ id: 'b', status: 'resolved' })];
+  return openFindings(list).length === 1 && openFindings(list)[0].id === 'a';
+})());
+chk('T47 openFindings keeps improving ones, which are not finished', (() => {
+  return openFindings([mkF({ id: 'a', status: 'improving' })]).length === 1;
+})());
+chk('T47 findingsForPrompt renders one plain line per open finding', (() => {
+  const lines = findingsForPrompt([mkF({ clubs: ['7-Iron','PW'] })]);
+  return lines.length === 1 && /early extension/i.test(lines[0]) && /7-Iron/.test(lines[0])
+    && !/[<>]/.test(lines[0]);
+})());
+chk('T47 findingsForPrompt states confidence and flags a downgrade', (() => {
+  const f = gradeFinding(mkF({ finding: 'swing-plane', cameraAngle: 'front-on', confidence: 'measured' }));
+  return /speculative/i.test(findingsForPrompt([f])[0]);
+})());
+chk('T47 findingsForPrompt on empty input returns an empty array', findingsForPrompt([]).length === 0);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

@@ -937,6 +937,90 @@ function gapLabel(gapToNext) {
   return null;
 }
 
+// ── Swing findings ───────────────────────────────────────────────────────────
+// Findings are conditions that persist until resolved, not events on a date.
+// That is why they are a standing list with a status rather than a log, and it
+// is what lets a video session's date sit anywhere relative to a range
+// session's without the two needing to align.
+//
+// The taxonomy is a fixed list because a finding is only trendable if it is
+// spelled the same way every time; "early extension" and "standing up through
+// impact" as free text would never group. `angles` names the camera views that
+// can actually support the observation, or null where either works. These come
+// from a real session where a swing-plane claim was made from a front-on clip
+// and had to be retracted — the view simply cannot show it.
+var FINDING_TAXONOMY = {
+  'early-extension':             { label: 'early extension',                 angles: ['down-the-line'] },
+  'swing-plane':                 { label: 'swing plane',                     angles: ['down-the-line'] },
+  'low-point-control':           { label: 'low point control',               angles: ['front-on'] },
+  'weight-transfer-quality':     { label: 'weight transfer quality',         angles: ['front-on'] },
+  'static-lower-body-transition':{ label: 'static lower body at transition', angles: ['front-on'] },
+  'backswing-width-turn':        { label: 'backswing width and turn',        angles: null },
+  'finish-balance':              { label: 'finish balance',                  angles: null },
+  'grip-setup':                  { label: 'grip and setup',                  angles: null },
+  'tempo-sequencing':            { label: 'tempo and sequencing',            angles: null },
+};
+var VALID_ANGLES = ['down-the-line', 'front-on', 'other'];
+var VALID_STATUS = ['open', 'improving', 'resolved'];
+
+function isKnownFinding(key) {
+  return Object.prototype.hasOwnProperty.call(FINDING_TAXONOMY, key);
+}
+
+// True only when this camera view can actually support this observation. A
+// null angle list means any view works; an unknown or missing angle supports
+// nothing, because "we do not know what the camera saw" is not evidence.
+function angleSupports(findingKey, angle) {
+  if (!isKnownFinding(findingKey)) return false;
+  const t = FINDING_TAXONOMY[findingKey];
+  if (t.angles === null) return VALID_ANGLES.indexOf(angle) >= 0;
+  return t.angles.indexOf(angle) >= 0;
+}
+
+// Downgrades a finding whose camera angle cannot support it, rather than
+// dropping it — the observation may still be worth recording, it just is not
+// evidence at the confidence originally claimed.
+function gradeFinding(f) {
+  const out = { ...f, confidenceNote: null };
+  if (!angleSupports(f.finding, f.cameraAngle) && f.confidence !== 'speculative') {
+    out.confidence = 'speculative';
+    out.confidenceNote = `downgraded: a ${f.cameraAngle || 'missing'} camera angle cannot support this observation`;
+  }
+  return out;
+}
+
+function mergeFindings(baseline, incoming) {
+  const map = {};
+  (baseline || []).forEach(f => { map[f.id] = { ...f }; });
+  (incoming || []).forEach(f => {
+    const prev = map[f.id];
+    // Later confirmation wins, so re-importing an older export cannot roll a
+    // finding back to a stale status.
+    if (!prev || (f.lastConfirmed || '') >= (prev.lastConfirmed || '')) map[f.id] = { ...f };
+  });
+  return Object.values(map).sort((a, b) =>
+    (a.firstNoted || '') < (b.firstNoted || '') ? -1 : 1);
+}
+
+function openFindings(findings) {
+  return (findings || []).filter(f => f && f.status !== 'resolved');
+}
+
+// Plain-text lines for the coach prompt. Confidence is always stated, so the
+// model can weigh a pixel-measured observation differently from an eyeballed
+// one instead of treating every finding as equally established.
+function findingsForPrompt(findings) {
+  return openFindings(findings).map(f => {
+    const t = FINDING_TAXONOMY[f.finding];
+    const name = t ? t.label : f.finding;
+    const clubs = (f.clubs || []).length ? ` on ${f.clubs.join(', ')}` : '';
+    const since = f.firstNoted ? `, first noted ${f.firstNoted}` : '';
+    const note = f.note ? ` — ${f.note}` : '';
+    const meas = f.measurement ? ` [${f.measurement}]` : '';
+    return `${name}${clubs} (${f.assessment}, ${f.confidence}, ${f.status}${since})${meas}${note}`;
+  });
+}
+
 // ── Recommendations ──────────────────────────────────────────────────────────
 // A dated log of practice priorities, each with a criterion specific enough to
 // be checked later. Outcomes are never inferred: a criterion is free text
