@@ -706,4 +706,22 @@ chk('T36 a 139-yard Toptracer 7-iron displays as 139 yards, not 152', (() => {
   return Math.abs(r.sessions[0].shots[0].carry * M_TO_YD - 139) < 0.5;
 })());
 
+// T37. A manual date fills in only where the parser found none.
+chk('T37 applySessionDate stamps sessions whose date was assumed', (() => {
+  const out = applySessionDate([{ date: '0000-00-00', dateAssumed: true, shots: [] }], '2026-09-11');
+  return out[0].date === '2026-09-11' && out[0].dateAssumed === false;
+})());
+chk('T37 applySessionDate leaves a parsed date alone', (() => {
+  const out = applySessionDate([{ date: '2026-08-22', dateAssumed: false, shots: [] }], '2026-09-11');
+  return out[0].date === '2026-08-22';
+})());
+chk('T37 applySessionDate is a no-op when no date is given', (() => {
+  const out = applySessionDate([{ date: '0000-00-00', dateAssumed: true, shots: [] }], '');
+  return out[0].date === '0000-00-00';
+})());
+chk('T37 applySessionDate rejects a malformed date', (() => {
+  const out = applySessionDate([{ date: '0000-00-00', dateAssumed: true, shots: [] }], 'not-a-date');
+  return out[0].date === '0000-00-00';
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

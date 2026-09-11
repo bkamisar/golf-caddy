@@ -124,6 +124,10 @@
       <option value="toptracer">Toptracer — CSV (yards)</option>
       <option value="generic">Other launch monitor — CSV (yards)</option>
     </select>
+    <label class="sub" style="text-transform:none;letter-spacing:0;display:block;margin-bottom:8px">
+      Session date
+      <input type="date" id="sessionDate" style="margin-left:6px">
+    </label>
     <div class="tagrow">
       <select id="tagBall"><option value="">Ball: unknown</option><option value="range">Range ball</option><option value="premium">Premium ball</option></select>
       <select id="tagVenue"><option value="">Venue: unknown</option><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select>
@@ -891,6 +895,13 @@ ${verdicts.map(v => '- ' + v.text.replace(/<\/?b>/g, '')).join('\n')}
 
 Debrief my ball-striking as a conversation between the four of you: what's real in the recent trend, what's noise, where you disagree, and end with ONE range priority each (a specific drill with success criteria), then a consensus pick for the single most valuable thing to work on next session.`;
 }
+// Neither Trackman's nor Toptracer's CSV export has a date column, so the form
+// supplies one. Applied only where the parser genuinely found no date
+// (dateAssumed), so a CSV that does carry per-row dates keeps them.
+function applySessionDate(sessions, dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return sessions;
+  return sessions.map(s => s.dateAssumed ? { ...s, date: dateStr, dateAssumed: false } : s);
+}
 /*ENGINE-END*/
 
 // ── UI ───────────────────────────────────────────────────────────────────────
@@ -1037,6 +1048,11 @@ function doParse() {
       : 'No rows recognized — the paste needs a header row with at least Date, Club, and one metric column.');
     return;
   }
+  result.sessions = applySessionDate(result.sessions, document.getElementById('sessionDate').value);
+  if (result.sessions.some(s => s.date === '0000-00-00')) {
+    msg('Pick a session date first — without one this paste merges into every other undated session and no trend can ever be computed.');
+    return;
+  }
   const tags = currentTags();
   const overrideName = document.getElementById('clubOverride').value;
   result.sessions.forEach(s => {
@@ -1093,6 +1109,7 @@ function doImport(ev) {
 function doClear() { if (confirm('Delete all stored range sessions?')) { localStorage.removeItem(LS); render(); } }
 
 populateClubOverride();
+document.getElementById('sessionDate').value = new Date().toISOString().slice(0, 10);
 render();
 </script>
 </body>
