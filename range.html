@@ -119,8 +119,10 @@
   <div class="sec">
     <h2>Add a session</h2>
     <select id="source" style="width:100%;margin-bottom:8px">
-      <option value="trackman">Trackman — paste one club's session table</option>
-      <option value="generic">Other launch monitor — CSV / table</option>
+      <option value="trackman_csv">Trackman — CSV export (yards)</option>
+      <option value="trackman">Trackman — table paste (metric)</option>
+      <option value="toptracer">Toptracer — CSV (yards)</option>
+      <option value="generic">Other launch monitor — CSV (yards)</option>
     </select>
     <div class="tagrow">
       <select id="tagBall"><option value="">Ball: unknown</option><option value="range">Range ball</option><option value="premium">Premium ball</option></select>
@@ -358,11 +360,20 @@ function parseFooterRow(line, cols) {
   }
   return { label: label.toLowerCase(), row };
 }
+// Canonical engine units are metres and m/s. Every parser converts here.
+// `side` gets its own unit because launch monitors disagree: Trackman's table
+// reports it in the same unit as carry, but Toptracer's CSV reports carry in
+// yards and offline in FEET. Defaults to units.distance when unset so the
+// existing Trackman table path is unaffected.
 function normalizeShotUnits(shot, units) {
   const s = { ...shot };
-  const dFactor = units.distance === 'yd' ? (1 / M_TO_YD) : 1;
+  const perUnit = { m: 1, yd: 1 / M_TO_YD, ft: 1 / 3.28084 };
+  const dFactor = perUnit[units.distance] != null ? perUnit[units.distance] : 1;
+  const sUnit = units.side || units.distance;
+  const sFactor = perUnit[sUnit] != null ? perUnit[sUnit] : 1;
   const vFactor = units.speed === 'mph' ? (1 / MS_TO_MPH) : 1;
-  ['carry', 'total', 'side', 'height'].forEach(k => { if (s[k] != null) s[k] = s[k] * dFactor; });
+  ['carry', 'total', 'height'].forEach(k => { if (s[k] != null) s[k] = s[k] * dFactor; });
+  if (s.side != null) s.side = s.side * sFactor;
   ['clubSpeed', 'ballSpeed'].forEach(k => { if (s[k] != null) s[k] = s[k] * vFactor; });
   return s;
 }
@@ -457,7 +468,8 @@ function normalizeClubCode(raw) {
   if (/^lob\s*-?\s*wedge$/i.test(s)) return 'lw';
   return s;
 }
-function parseGenericLM(text) {
+function parseGenericLM(text, units) {
+  const u = units || { distance: 'yd', side: 'ft', speed: 'mph' };
   const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
   if (lines.length < 2) return { sessions: [], skipped: [], checks: [] };
   const delim = lines[0].includes('\t') ? '\t' : ',';
@@ -500,12 +512,12 @@ function parseGenericLM(text) {
     if (!clubCode || (col.clubSpeed < 0 && col.ballSpeed < 0 && col.carry < 0)) { skipped.push(line); return; }
     const date = parseDateLoose(col.date >= 0 ? c[col.date] : '');
     const club = canonicalClub(normalizeClubCode(clubCode));
-    const shot = {
+    const shot = normalizeShotUnits({
       clubSpeed: num(c, col.clubSpeed), attackAngle: num(c, col.attackAngle),
       ballSpeed: num(c, col.ballSpeed), spin: num(c, col.spin), launch: num(c, col.launch),
       carry: num(c, col.carry), total: num(c, col.total), side: side(c, col.side),
       height: num(c, col.height), smash: num(c, col.smash),
-    };
+    }, u);
     const key = `${date}|${club.name}`;
     (byKey[key] = byKey[key] || { date, dateAssumed: col.date < 0, clubCode, club, tags: {}, shots: [] }).shots.push(shot);
   });
@@ -515,10 +527,22 @@ function parseGenericLM(text) {
 // var, not const: T9 references SOURCES by bare name outside the eval() that
 // loads this block, and direct eval only leaks var/function declarations to
 // the caller's scope, never const/let (see Task 1's finding on this exact issue).
+// Each entry binds three independent things: which parser reads the text, which
+// launch monitor the data came from, and what units that export uses. They are
+// genuinely independent — the user's Trackman data arrives as an imperial CSV,
+// which is the same parser as Toptracer but a different instrument, and a
+// different unit set from Trackman's own metric table paste.
 var SOURCES = {
-  trackman: { label: 'Trackman (range table)', parse: parseTrackman },
-  generic:  { label: 'Other launch monitor (CSV/table)', parse: parseGenericLM },
+  trackman:     { label: 'Trackman — table paste',   parse: parseTrackman,  source: 'trackman',
+                  units: { distance: 'm',  side: 'm',  speed: 'ms'  } },
+  trackman_csv: { label: 'Trackman — CSV export',    parse: parseGenericLM, source: 'trackman',
+                  units: { distance: 'yd', side: 'ft', speed: 'mph' } },
+  toptracer:    { label: 'Toptracer — CSV',          parse: parseGenericLM, source: 'toptracer',
+                  units: { distance: 'yd', side: 'ft', speed: 'mph' } },
+  generic:      { label: 'Other launch monitor — CSV', parse: parseGenericLM, source: 'other',
+                  units: { distance: 'yd', side: 'ft', speed: 'mph' } },
 };
+var VALID_SOURCES = ['trackman', 'toptracer', 'other', 'unknown'];
 
 // ── Merge: same date + same club = one club-session; shots dedup exactly ─────
 function shotKey(s) {
@@ -1006,7 +1030,7 @@ function msg(t) { document.getElementById('msg').textContent = t; }
 function doParse() {
   const src = document.getElementById('source').value;
   const pasteText = document.getElementById('paste').value;
-  const result = SOURCES[src].parse(pasteText);
+  const result = SOURCES[src].parse(pasteText, SOURCES[src].units);
   if (!result.sessions.length) {
     msg(src === 'trackman'
       ? 'No shots recognized — paste the whole per-club table, including the header row (Club Speed, Ball Speed, Carry, ...).'

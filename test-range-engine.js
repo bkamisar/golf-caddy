@@ -131,7 +131,9 @@ const genCsv = `Date,Club,Club Speed,Ball Speed,Spin Rate,Carry,Side\n` +
   `2026-08-15,7 Iron,90.5,120.3,6200,145.2,-3.1\n` +
   `2026-08-15,7 Iron,91.0,121.0,6100,147.0,2.4\n` +
   `2026-08-15,Driver,105.2,155.0,2400,240.0,5.0`;
-const p8 = parseGenericLM(genCsv);
+// Explicit metric units: this test checks column-mapping/grouping logic, not
+// unit conversion (covered separately by T36), so pass through unconverted.
+const p8 = parseGenericLM(genCsv, { distance: 'm', side: 'm', speed: 'ms' });
 chk('T8 two club-sessions grouped (7 Iron, Driver)', p8.sessions.length === 2);
 const s8seven = p8.sessions.find(s => s.club.name === '7-Iron');
 chk('T8 7-Iron session has 2 shots', s8seven && s8seven.shots.length === 2);
@@ -152,7 +154,9 @@ chk('T9 trackman source parses the sample', SOURCES.trackman.parse(SAMPLE_7I).se
 const genCsvSpeedFirst = `Date,Club Speed,Club,Ball Speed,Carry\n` +
   `2026-08-15,90.5,7 Iron,120.3,145.2\n` +
   `2026-08-15,91.0,7 Iron,121.0,147.0`;
-const p10a = parseGenericLM(genCsvSpeedFirst);
+// Explicit metric units: this test checks the club/club-speed column-hijack
+// regression, not unit conversion (covered separately by T36).
+const p10a = parseGenericLM(genCsvSpeedFirst, { distance: 'm', side: 'm', speed: 'ms' });
 chk('T10a club column not hijacked by Club Speed column', p10a.sessions.length === 1);
 const s10a = p10a.sessions[0];
 chk('T10a club name is not a numeric string', s10a && !/^\d+(\.\d+)?$/.test(s10a.club.name));
@@ -662,5 +666,44 @@ chk('T35 8-Wood and 9-Wood recognized, sort before hybrids', canonicalClub('8w')
 chk('T35 1-Hybrid recognized, sorts before 2-Hybrid', canonicalClub('1h').name === '1-Hybrid' && canonicalClub('1h').klass === 'hybrid' && canonicalClub('1h').order < canonicalClub('2h').order);
 chk('T35 8-Hybrid and 9-Hybrid recognized, sort before irons', canonicalClub('8h').name === '8-Hybrid' && canonicalClub('9h').name === '9-Hybrid' && canonicalClub('9h').order < canonicalClub('1i').order);
 chk('T35 klass also heals from "unknown" to "hybrid"', hyb35.klass === 'hybrid');
+
+// T36. Units are declared per source and normalized to metres/m-per-s at parse.
+chk('T36 normalizeShotUnits converts yards to metres', (() => {
+  const s = normalizeShotUnits({ carry: 109.361 }, { distance: 'yd', speed: 'mph' });
+  return Math.abs(s.carry - 100) < 0.01;
+})());
+chk('T36 normalizeShotUnits converts mph to m/s', (() => {
+  const s = normalizeShotUnits({ ballSpeed: 22.3694 }, { distance: 'm', speed: 'mph' });
+  return Math.abs(s.ballSpeed - 10) < 0.01;
+})());
+chk('T36 side can use feet independently of the distance unit', (() => {
+  const s = normalizeShotUnits({ carry: 109.361, side: 32.8084 }, { distance: 'yd', side: 'ft', speed: 'mph' });
+  return Math.abs(s.carry - 100) < 0.01 && Math.abs(s.side - 10) < 0.01;
+})());
+chk('T36 side defaults to the distance unit when unspecified (back-compat)', (() => {
+  const s = normalizeShotUnits({ side: 109.361 }, { distance: 'yd', speed: 'mph' });
+  return Math.abs(s.side - 100) < 0.01;
+})());
+chk('T36 metric input passes through untouched', (() => {
+  const s = normalizeShotUnits({ carry: 100, side: 10, ballSpeed: 40 }, { distance: 'm', side: 'm', speed: 'ms' });
+  return s.carry === 100 && s.side === 10 && s.ballSpeed === 40;
+})());
+chk('T36 every SOURCES entry declares units and a source tag', (() => {
+  return Object.keys(SOURCES).every(k => {
+    const e = SOURCES[k];
+    return e.source && e.units && e.units.distance && e.units.speed && typeof e.parse === 'function';
+  });
+})());
+chk('T36 toptracer CSV carry lands in metres', (() => {
+  const csv = 'Club,Shot,Flat Carry (yd),Offline (ft) [+R/-L],Ball Speed (mph)\n7 Iron,1,139,-9,105';
+  const r = SOURCES.toptracer.parse(csv, SOURCES.toptracer.units);
+  const sh = r.sessions[0].shots[0];
+  return Math.abs(sh.carry - 127.1) < 0.5 && Math.abs(sh.side - (-2.74)) < 0.05;
+})());
+chk('T36 a 139-yard Toptracer 7-iron displays as 139 yards, not 152', (() => {
+  const csv = 'Club,Shot,Flat Carry (yd),Ball Speed (mph)\n7 Iron,1,139,105';
+  const r = SOURCES.toptracer.parse(csv, SOURCES.toptracer.units);
+  return Math.abs(r.sessions[0].shots[0].carry * M_TO_YD - 139) < 0.5;
+})());
 
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
