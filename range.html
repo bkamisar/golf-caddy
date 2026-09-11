@@ -137,13 +137,18 @@
     <select id="clubOverride" style="width:100%;margin-bottom:8px"><option value="">Club: auto-detect from paste</option></select>
     <textarea id="paste" placeholder="Trackman: select the whole per-club shot table (header through the Consistency row) → copy → paste. Re-pasting is safe — duplicate shots merge."></textarea>
     <button onclick="doParse()">Parse &amp; save</button>
-    <button class="ghost" onclick="doExport()">Export JSON</button>
+    <button class="ghost" onclick="doSaveToFile()">Save to data file</button>
     <button class="ghost" onclick="document.getElementById('imp').click()">Import</button>
     <button class="ghost" onclick="doClear()">Clear all</button>
     <input type="file" id="imp" style="display:none" onchange="doImport(event)">
     <div id="msg"></div>
   </div>
 
+  <div class="sec" id="filterbar" style="padding-bottom:0;border-bottom:0">
+    <label class="sub" style="text-transform:none;letter-spacing:0">Launch monitor:
+      <select id="sourceFilter" onchange="render()" style="margin-left:6px"></select>
+    </label>
+  </div>
   <div id="dash"></div>
   <div class="foot">Gapping uses the clean-shot median after mishit quarantine, not Trackman's on-screen average, which includes duffs. Trend compares your most recent 2 sessions per club against the previous 3. Nothing leaves your browser.</div>
 </div>
@@ -1053,7 +1058,15 @@ function spark(vals, invert) {
 }
 
 function render() {
-  const clubSessions = load();
+  const allSessions = load();
+  const present = [...new Set(allSessions.map(cs => cs.source || 'unknown'))].sort();
+  const sel = document.getElementById('sourceFilter');
+  const want = sel.value || 'all';
+  sel.innerHTML = '<option value="all">All sources</option>' +
+    present.map(s => `<option value="${esc(s)}"${s === want ? ' selected' : ''}>${esc(s)}</option>`).join('');
+  if (want !== 'all' && present.indexOf(want) < 0) sel.value = 'all';
+  const clubSessions = sel.value === 'all' ? allSessions
+    : allSessions.filter(cs => (cs.source || 'unknown') === sel.value);
   const dash = document.getElementById('dash');
   if (!clubSessions.length) {
     dash.innerHTML = '<div class="sec"><h2>No sessions yet</h2><div class="note"><span class="dot"></span><span class="txt">Paste your Trackman club table above to get started.</span></div></div>';
@@ -1068,6 +1081,7 @@ function render() {
   const savedRowsHtml = savedSessionRows.map((row, i) => `<tr>
     <td>${esc(row.clubName)}</td>
     <td>${esc(row.date)}</td>
+    <td>${esc(row.source)}</td>
     <td class="num">${row.clean}/${row.total}</td>
     <td class="num">${row.mishitRate != null ? row.mishitRate + '%' : '–'}</td>
     <td><button class="ghost danger small" onclick="doDeleteSession(${i})">Delete</button></td>
@@ -1119,7 +1133,7 @@ function render() {
     </div>
   </div>
   <div class="sec"><h2>Saved sessions</h2>
-    <table><tr><th>Club</th><th>Date</th><th>Clean/Total</th><th>Mishit</th><th></th></tr>
+    <table><tr><th>Club</th><th>Date</th><th>Source</th><th>Clean/Total</th><th>Mishit</th><th></th></tr>
     ${savedRowsHtml}</table>
   </div>
   <div class="sec"><h2>Coach debrief — copy into Claude</h2>
@@ -1164,10 +1178,26 @@ function doParse() {
   render();
 }
 
-function doExport() {
+// Writes the full composed dataset back to data/range.json. On Chrome/Edge the
+// File System Access API writes the repo file in place; elsewhere it falls back
+// to a download the user saves over that path manually. Either way the user
+// then commits and pushes — that is what makes the phone see it.
+function doSaveToFile() {
+  const json = JSON.stringify(load(), null, 1);
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({
+      suggestedName: 'range.json',
+      types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+    }).then(handle => handle.createWritable())
+      .then(w => w.write(json).then(() => w.close()))
+      .then(() => msg('Saved. Commit and push in GitHub Desktop to update your phone.'))
+      .catch(e => { if (e && e.name !== 'AbortError') msg('Save failed — use the download fallback.'); });
+    return;
+  }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(load(), null, 1)], { type: 'application/json' }));
-  a.download = 'golf-range.json'; a.click();
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = 'range.json'; a.click();
+  msg('Downloaded. Save it over data/range.json, then commit and push.');
 }
 function doImport(ev) {
   const f = ev.target.files[0]; if (!f) return;
