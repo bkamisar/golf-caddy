@@ -1003,4 +1003,72 @@ chk('T45 echoes a prior recommendation when one is supplied', (() => {
 })());
 chk('T45 no leftover HTML tags', !/<\/?b>/.test(P45));
 
+// T46. Recommendations store. The continuity check needs exactly one open
+// question per source — "did you do the thing you said you'd do?" — so the
+// engine enforces at most one pending recommendation per source and scopes
+// lookups by source (a putting drill cannot be judged from launch data).
+const mkRec = (date, source, priority, outcome) => ({
+  date, source, priority, criterion: '8 of 10 inside 6 yards',
+  outcome: outcome || 'pending', outcomeNote: null, outcomeDate: null,
+});
+
+chk('T46 recKey is date plus source', recKey(mkRec('2026-09-01', 'range', 'A')) === '2026-09-01|range');
+chk('T46 same day, different sources do not collide', (() => {
+  const merged = mergeRecommendations([], [mkRec('2026-09-01','range','A'), mkRec('2026-09-01','round','B')]);
+  return merged.length === 2;
+})());
+chk('T46 same day and source is one record, incoming wins', (() => {
+  const merged = mergeRecommendations([mkRec('2026-09-01','range','old')], [mkRec('2026-09-01','range','new')]);
+  return merged.length === 1 && merged[0].priority === 'new';
+})());
+chk('T46 merge is idempotent', (() => {
+  const once = mergeRecommendations([], [mkRec('2026-09-01','range','A')]);
+  return mergeRecommendations(once, [mkRec('2026-09-01','range','A')]).length === 1;
+})());
+chk('T46 results are sorted oldest to newest', (() => {
+  const m = mergeRecommendations([], [mkRec('2026-09-08','range','B'), mkRec('2026-09-01','range','A')]);
+  return m[0].date === '2026-09-01' && m[1].date === '2026-09-08';
+})());
+
+chk('T46 lastRecommendation returns the pending one for the given sources', (() => {
+  const recs = [mkRec('2026-08-01','range','old','met'), mkRec('2026-09-01','range','current')];
+  return lastRecommendation(recs, ['range','video']).priority === 'current';
+})());
+chk('T46 lastRecommendation ignores other sources', (() => {
+  const recs = [mkRec('2026-09-01','round','putting drill')];
+  return lastRecommendation(recs, ['range','video']) === null;
+})());
+chk('T46 a video-sourced priority is assessed by the range', (() => {
+  const recs = [mkRec('2026-09-01','video','stop early extension')];
+  return lastRecommendation(recs, ['range','video']).priority === 'stop early extension';
+})());
+chk('T46 an already-answered recommendation is closed, not re-asked', (() => {
+  return lastRecommendation([mkRec('2026-09-01','range','done','met')], ['range']) === null;
+})());
+chk('T46 the newest pending wins when several exist', (() => {
+  const recs = [mkRec('2026-08-01','range','older'), mkRec('2026-09-01','range','newer')];
+  return lastRecommendation(recs, ['range']).priority === 'newer';
+})());
+chk('T46 empty and undefined input return null without throwing',
+  lastRecommendation([], ['range']) === null && lastRecommendation(undefined, ['range']) === null);
+
+chk('T46 closePending stamps the outcome on the open record only', (() => {
+  const recs = [mkRec('2026-08-01','range','a','met'), mkRec('2026-09-01','range','b')];
+  const out = closePending(recs, ['range'], 'not-met', 'only got 5 of 10', '2026-09-10');
+  const closed = out.find(r => r.priority === 'b');
+  return closed.outcome === 'not-met' && closed.outcomeNote === 'only got 5 of 10'
+    && closed.outcomeDate === '2026-09-10' && out.find(r => r.priority === 'a').outcome === 'met';
+})());
+chk('T46 closePending does not mutate its input', (() => {
+  const recs = [mkRec('2026-09-01','range','b')];
+  closePending(recs, ['range'], 'met', null, '2026-09-10');
+  return recs[0].outcome === 'pending';
+})());
+chk('T46 closePending with nothing pending is a no-op', (() => {
+  const recs = [mkRec('2026-09-01','range','a','met')];
+  return closePending(recs, ['range'], 'met', null, '2026-09-10').length === 1;
+})());
+chk('T46 VALID_OUTCOMES covers the four states', ['pending','met','not-met','insufficient-data']
+  .every(o => VALID_OUTCOMES.indexOf(o) >= 0));
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

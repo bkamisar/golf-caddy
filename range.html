@@ -924,6 +924,56 @@ function gapLabel(gapToNext) {
   return null;
 }
 
+// ── Recommendations ──────────────────────────────────────────────────────────
+// A dated log of practice priorities, each with a criterion specific enough to
+// be checked later. Outcomes are never inferred: a criterion is free text
+// ("8 of 10 inside 6 yards"), and a parser that half-understood one would
+// quietly mark things met that were not. The user records the outcome, and the
+// natural moment to ask is when they log the NEXT priority — they have just
+// read a debrief that told them both answers.
+var VALID_OUTCOMES = ['pending', 'met', 'not-met', 'insufficient-data'];
+var REC_SOURCES = ['range', 'round', 'video'];
+
+// Keyed by date+source so the range and round debriefs can each write a
+// priority on the same day without overwriting each other.
+function recKey(rec) {
+  return `${rec.date}|${rec.source}`;
+}
+
+function mergeRecommendations(baseline, incoming) {
+  const map = {};
+  (baseline || []).forEach(r => { map[recKey(r)] = { ...r }; });
+  (incoming || []).forEach(r => { map[recKey(r)] = { ...r }; });
+  return Object.values(map).sort((a, b) =>
+    a.date < b.date ? -1 : a.date > b.date ? 1 : (a.source < b.source ? -1 : 1));
+}
+
+// The one open question for these sources, or null. Sources are passed in
+// rather than hardcoded because a video-derived swing priority is assessed by
+// range data, while a putting drill is assessed by round data — the pages ask
+// for different slices. Only 'pending' records are returned: once an outcome
+// is recorded the loop on that recommendation is closed, and asking about it
+// again in the next debrief would be noise.
+function lastRecommendation(recs, sources) {
+  const want = sources || [];
+  const open = (recs || [])
+    .filter(r => r && r.outcome === 'pending' && want.indexOf(r.source) >= 0)
+    .sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return open.length ? open[open.length - 1] : null;
+}
+
+// Stamps an outcome onto the open recommendation for these sources. Returns a
+// new array; never mutates, because the caller still holds the pre-change list
+// for its own undo/compare paths.
+function closePending(recs, sources, outcome, note, when) {
+  const target = lastRecommendation(recs, sources);
+  if (!target) return (recs || []).map(r => ({ ...r }));
+  const key = recKey(target);
+  return (recs || []).map(r => recKey(r) === key
+    ? { ...r, outcome, outcomeNote: note || null, outcomeDate: when || null }
+    : { ...r });
+}
+
 // Conditions that could explain a number without any change in the swing.
 // Computed here rather than left to the model to infer, because the model
 // cannot see what is absent from the data it was handed — a club backed by
