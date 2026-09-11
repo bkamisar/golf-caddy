@@ -79,4 +79,56 @@ const a8 = parseGrint(dup).rounds;
 const m8 = mergeRounds([], a8);
 chk('A8 two rounds same date both kept', m8.all.length === 2);
 
+// A9. Partial rounds (a walk-off before 18) count for per-hole component
+// metrics but never for the handicap differential trend. Found when a real
+// 13-hole round was about to be pasted: the component filter matched only
+// holes===9 or holes===18, so 13 contributed to nothing, and the differential
+// fallback had no hole-count guard, so it invented a differential by treating
+// a 13-hole score as an 18-hole one.
+const mkRound = (date, holes, score, putts) => ({
+  date, course: 'Test GC', rating: 68.2, slope: 129,
+  score, holes, putts, gir: 17, fir: 62, diff: null,
+});
+
+chk('A9 the differential fallback fires for a full 18', (() => {
+  const r = finalizeRound(mkRound('2026-09-05', 18, 99, 44));
+  return r.diff != null && Math.abs(r.diff - 27.0) < 0.1;
+})());
+chk('A9 the differential fallback does NOT fire for a 13-hole round', (() => {
+  return finalizeRound(mkRound('2026-09-06', 13, 72, 32)).diff === null;
+})());
+chk('A9 a differential the source app supplied for a short round is preserved', (() => {
+  const r = finalizeRound({ ...mkRound('2026-09-06', 13, 72, 32), diff: 31.4 });
+  return r.diff === 31.4;
+})());
+chk('A9 a 13-hole round reaches the component corpus', (() => {
+  const rounds = [
+    finalizeRound(mkRound('2026-09-01', 18, 99, 44)),
+    finalizeRound(mkRound('2026-09-02', 18, 101, 45)),
+    finalizeRound(mkRound('2026-09-03', 18, 98, 43)),
+    finalizeRound(mkRound('2026-09-06', 13, 72, 32)),
+  ];
+  const m = computeMetrics(rounds);
+  return m.all.some(r => r.holes === 13 && r.puttsPH != null);
+})());
+chk('A9 the 13-hole round stays out of the differential trend corpus', (() => {
+  const rounds = [
+    finalizeRound(mkRound('2026-09-01', 18, 99, 44)),
+    finalizeRound(mkRound('2026-09-02', 18, 101, 45)),
+    finalizeRound(mkRound('2026-09-03', 18, 98, 43)),
+    finalizeRound(mkRound('2026-09-06', 13, 72, 32)),
+  ];
+  // n counts only 18-hole rounds carrying a differential.
+  return computeMetrics(rounds).n === 3;
+})());
+chk('A9 putts/hole is computed off actual holes played, not assumed 18', (() => {
+  const r = finalizeRound(mkRound('2026-09-06', 13, 72, 32));
+  const m = computeMetrics([r,
+    finalizeRound(mkRound('2026-09-01', 18, 99, 44)),
+    finalizeRound(mkRound('2026-09-02', 18, 101, 45)),
+    finalizeRound(mkRound('2026-09-03', 18, 98, 43))]);
+  const short = m.all.find(x => x.holes === 13);
+  return Math.abs(short.puttsPH - 32 / 13) < 1e-9;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

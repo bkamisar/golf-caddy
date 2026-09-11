@@ -209,7 +209,12 @@ function finalizeRound(r) {
   if (r.score == null || r.score <= 0) return null;
   if (!r.holes) r.holes = 18;
   // Differential fallback when the app doesn't export one but gives rating+slope.
-  if (r.diff == null && r.rating != null && r.slope)
+  // Only for a full 18: the formula assumes an 18-hole score against an 18-hole
+  // course rating, so running it on a partial round (a 13-hole walk-off, say)
+  // invents a differential far better than the golfer actually played. A diff
+  // the source app supplied for a short round is left alone — that's their
+  // number, and the trend corpus filters to 18-hole rounds regardless.
+  if (r.diff == null && r.holes === 18 && r.rating != null && r.slope)
     r.diff = Math.round((r.score - r.rating) * 113 / r.slope * 10) / 10;
   r.course = (r.course || '').replace(/\s+/g, ' ').trim();
   return r;
@@ -335,8 +340,12 @@ function computeMetrics(rounds) {
   const prev10 = full.slice(-15, -5);                    // recent baseline, not stale all-prior
   const last10 = full.slice(-10);
   const bestDecile = quantile(sortedDiffs, 0.10);
-  // Component corpus: 9-hole rounds count too (per-hole normalized), minus suspects.
-  const comp  = all.filter(r => (r.holes === 18 || r.holes === 9) && !r.suspect);
+  // Component corpus: any round of 9+ holes counts, not just 9 and 18. Every
+  // component metric (puttsPH, longPH, puttsVsExpPH) divides by r.holes, so a
+  // partial round is already normalized and belongs here — an earlier
+  // exact-match filter silently discarded a 13-hole walk-off entirely. Below 9
+  // holes the per-hole rates get too noisy to median usefully.
+  const comp  = all.filter(r => r.holes >= 9 && !r.suspect);
   const comp5 = comp.slice(-5);
 
   const m = {
