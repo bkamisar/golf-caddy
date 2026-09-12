@@ -200,6 +200,39 @@ Video establishes positions and mechanism. Ball flight comes only from the
 launch monitor. The prompt states this rule explicitly so the two are never
 conflated.
 
+## Hole-level data
+
+`data/hole-detail.json` holds per-hole records for rounds where the scorecard
+was captured: par, score, putts, first-putt distance, GIR, fairway, tee club,
+and miss direction. Send scorecard screenshots in a Claude Code session and the
+data is extracted, cross-checked against the card's own printed subtotals, and
+committed — there is no paste form for it.
+
+What it unlocks that round totals cannot:
+
+- **Putting versus chipping.** Putts after a green hit compared against putts
+  after a miss. A healthy short game puts the *miss* number lower — a chip
+  should finish closer than a long first putt on a green you hit. When the miss
+  number is higher, the problem is chip proximity, not the stroke.
+- **Blow-up holes**, counted concretely as double bogey or worse, and the share
+  of your strokes over par they account for.
+- **Par-3 play isolated** from par 4s and 5s, so iron play is visible
+  separately from what the tee shot set up.
+- **3-putt rate by first-putt distance**, once enough distances are logged.
+  Three-putting from 40 feet is unremarkable; from 8 feet it is not, and a
+  round-level putts total cannot tell those apart.
+
+There is deliberately no "strokes lost to putting" figure for this split. That
+number requires a baseline for how a golfer *should* putt from each distance,
+published versions are calibrated for scratch or tour players, and a
+self-calibrated one is circular — measuring yourself against your own average
+yields zero by construction. 3-putt rate is anchored to two-putt regulation
+instead, which is a rule of the game rather than a claim about other golfers.
+
+This tier covers far fewer rounds than the 43-round differential trend, so every
+figure in it carries its own sample size and the prompt is told to treat it as
+provisional.
+
 ## Opening the files directly
 
 Double-clicking the HTML (a `file://` URL) still works, but browsers block
