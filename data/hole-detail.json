@@ -126,5 +126,51 @@
       { "hole": 17, "par": 5, "score": 7, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": null, "fir": false, "driveMiss": "short" },
       { "hole": 18, "par": 4, "score": 7, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "Dr", "fir": false, "driveMiss": "short" }
     ]
+  },
+  {
+    "date": "2026-07-10",
+    "course": "Trillium Links and Lake Club",
+    "rating": 67.3,
+    "slope": 132,
+    "score": 104,
+    "putts": 46,
+    "girPct": 17,
+    "firPct": 54,
+    "penalties": 1.5,
+    "verified": {
+      "parSum": "36 out / 36 in / 72 total — matches card exactly",
+      "scoreSum": "55 out / 49 in / 104 total — matches card exactly, and matches data/rounds.json",
+      "puttsSum": "23 out / 23 in / 46 total — matches card exactly, and matches data/rounds.json",
+      "girCount": "1 of 9 out (11%) / 2 of 9 in (22%) / 3 of 18 total (17%) — matches every printed percentage exactly",
+      "firRatio": "3/7 out, 4/6 in, 7/13 total (54%) — matches every printed fraction/percentage exactly"
+    },
+    "unresolved": [
+      "Confirms a new icon: a double-chevron pointing LEFT («) appears in the GIR row on holes 5 and 9, distinct from the right-pointing (») seen elsewhere. Recorded as girMiss:'severe' on the existing precedent that a chevron of either orientation means severe, not as a new category — worth confirming if a future capture shows the two are actually different.",
+      "Confirms another new icon: an up-arrow in the GIR row (hole 13) meaning missed long -- the direct par-3 analogue of the up-arrow already confirmed in the driving row.",
+      "Hole 17's DISTANCE (ft) cell reads '50+', not an exact number. Recorded as firstPuttFt:50 (a floor, not the true value) -- do not treat this hole's distance as precise if it is ever used in a rollup.",
+      "Tee club was not legible for holes 5, 6, 7, 13, 15, and 18. Their fir/gir classifications are still confirmed directly from the driving/GIR icons themselves and reconcile exactly against every printed subtotal, so this does not affect confidence in those fields -- only teeClub is unknown for these holes.",
+      "Hole 12 carries a 'D' (drop shot) penalty code and hole 16 an 'S' (greenside bunker) lie code in the PENALTIES row -- the same lie-code/stroke-count ambiguity flagged on prior captures. Round-level penalties recorded as the printed total (1.5); no per-hole penalty field exists in this schema."
+    ],
+    "holes": [
+      { "hole": 1,  "par": 4, "score": 7, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "short",  "teeClub": "Dr",  "fir": false, "driveMiss": "short" },
+      { "hole": 2,  "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": "Dr",  "fir": false, "driveMiss": "right" },
+      { "hole": 3,  "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": "Dr",  "fir": true,  "driveMiss": null },
+      { "hole": 4,  "par": 5, "score": 7, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": "Dr",  "fir": true,  "driveMiss": null },
+      { "hole": 5,  "par": 3, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "severe", "teeClub": null,  "fir": null,  "driveMiss": null },
+      { "hole": 6,  "par": 4, "score": 7, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": null,  "fir": false, "driveMiss": "severe" },
+      { "hole": 7,  "par": 5, "score": 8, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": null,  "fir": false, "driveMiss": null },
+      { "hole": 8,  "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,     "teeClub": "Dr",  "fir": true,  "driveMiss": null },
+      { "hole": 9,  "par": 3, "score": 5, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "severe", "teeClub": "PW",  "fir": null,  "driveMiss": null },
+
+      { "hole": 10, "par": 5, "score": 6, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 11, "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 12, "par": 5, "score": 8, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": false, "driveMiss": null },
+      { "hole": 13, "par": 3, "score": 5, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "long", "teeClub": null, "fir": null,  "driveMiss": null },
+      { "hole": 14, "par": 5, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss","teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 15, "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "short","teeClub": null, "fir": null,  "driveMiss": null },
+      { "hole": 16, "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "short","teeClub": "7i", "fir": null,  "driveMiss": null },
+      { "hole": 17, "par": 4, "score": 6, "putts": 3, "firstPuttFt": 50,   "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": false, "driveMiss": "short" },
+      { "hole": 18, "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": true,  "driveMiss": null }
+    ]
   }
 ]
