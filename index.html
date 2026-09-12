@@ -374,13 +374,24 @@ function puttsByGreenResult(rounds) {
       (h.gir ? hit : miss).push(h.putts);
     });
   });
+  const afterGir = hit.length ? mean(hit) : null;
+  const afterMiss = miss.length ? mean(miss) : null;
   return {
-    afterGir: hit.length ? mean(hit) : null,
-    afterMiss: miss.length ? mean(miss) : null,
+    afterGir, afterMiss,
     nGir: hit.length, nMiss: miss.length,
     // Returned rather than read from the consts by callers/tests: these are
     // `const` in this engine block and do not survive the test harness's eval.
     expGir: EXP_PUTT_GIR, expMiss: EXP_PUTT_MISS,
+    // How far each bucket sits from ITS OWN expectation, not from the other
+    // bucket. Comparing afterMiss to afterGir directly conflates two
+    // different baselines (a chip is expected to leave a closer first putt
+    // than a full approach shot, so expMiss < expGir even in a healthy
+    // short game) — a user reading "2.3 vs 2.5" reasonably asks why the
+    // smaller number is the flagged one. Comparing each to its own norm
+    // answers that without requiring the reader to already know which
+    // direction is supposed to be bigger.
+    gapGir: afterGir != null ? afterGir - EXP_PUTT_GIR : null,
+    gapMiss: afterMiss != null ? afterMiss - EXP_PUTT_MISS : null,
   };
 }
 
@@ -736,8 +747,14 @@ function coachPrompt(m, lastRec) {
   let holeSection = '';
   if (ht.nRounds) {
     const p = ht.putts;
-    const chipFlag = (p.afterGir != null && p.afterMiss != null && p.afterMiss > p.afterGir)
-      ? ' — note this is INVERTED: putts after a miss should run lower than after a hit, because a chip should finish closer than a long first putt on a green hit. Higher after a miss points at chip proximity, not the putting stroke.'
+    // Flagged on the GAP from each bucket's own expectation, not on comparing
+    // the two raw numbers to each other — afterGir and afterMiss have
+    // different baselines (expMiss < expGir even in a healthy short game),
+    // so "afterMiss > afterGir" alone reads as backwards to someone who
+    // doesn't already know which direction is supposed to be bigger.
+    const signed = v => (v >= 0 ? '+' : '') + r1(v);
+    const chipFlag = (p.gapGir != null && p.gapMiss != null && p.gapMiss > p.gapGir)
+      ? ` — the miss-bucket sits ${signed(p.gapMiss)} strokes over its own expectation, well past the hit-bucket's ${signed(p.gapGir)}. That points at chip proximity, not the putting stroke: a chip should finish closer than a long first putt on a green hit, so misses should track the norm as well as hits do, not worse.`
       : '';
     const bu = ht.blowUps;
     const buTotal = bu.reduce((s, b) => s + b.blowUps, 0);
@@ -908,15 +925,15 @@ function render() {
   </div>
   ${m.holeTier && m.holeTier.nRounds ? `<div class="sec"><h2>Hole-level — ${m.holeTier.nRounds} round(s)</h2>
     <table>
-      <tr><th>Measure</th><th>Value</th><th>Reference</th></tr>
-      <tr><td>Putts after a green hit</td><td class="num">${r1(m.holeTier.putts.afterGir) ?? '–'}</td><td class="num">${m.holeTier.putts.expGir}</td></tr>
-      <tr><td>Putts after a miss</td><td class="num">${r1(m.holeTier.putts.afterMiss) ?? '–'}</td><td class="num">${m.holeTier.putts.expMiss}</td></tr>
-      <tr><td>Blow-up holes (double+)</td><td class="num">${m.holeTier.blowUps.reduce((s, b) => s + b.blowUps, 0)}</td><td class="num"></td></tr>
-      <tr><td>Over par — par 3s</td><td class="num">${r1(m.holeTier.parType.par3) ?? '–'}</td><td class="num"></td></tr>
-      <tr><td>Over par — par 4s</td><td class="num">${r1(m.holeTier.parType.par4) ?? '–'}</td><td class="num"></td></tr>
+      <tr><th>Measure</th><th>Value</th><th>Reference</th><th>vs. reference</th></tr>
+      <tr><td>Putts after a green hit</td><td class="num">${r1(m.holeTier.putts.afterGir) ?? '–'}</td><td class="num">${m.holeTier.putts.expGir}</td><td class="num">${m.holeTier.putts.gapGir != null ? (m.holeTier.putts.gapGir >= 0 ? '+' : '') + r1(m.holeTier.putts.gapGir) : '–'}</td></tr>
+      <tr><td>Putts after a miss</td><td class="num">${r1(m.holeTier.putts.afterMiss) ?? '–'}</td><td class="num">${m.holeTier.putts.expMiss}</td><td class="num">${m.holeTier.putts.gapMiss != null ? (m.holeTier.putts.gapMiss >= 0 ? '+' : '') + r1(m.holeTier.putts.gapMiss) : '–'}</td></tr>
+      <tr><td>Blow-up holes (double+)</td><td class="num">${m.holeTier.blowUps.reduce((s, b) => s + b.blowUps, 0)}</td><td class="num"></td><td class="num"></td></tr>
+      <tr><td>Over par — par 3s</td><td class="num">${r1(m.holeTier.parType.par3) ?? '–'}</td><td class="num"></td><td class="num"></td></tr>
+      <tr><td>Over par — par 4s</td><td class="num">${r1(m.holeTier.parType.par4) ?? '–'}</td><td class="num"></td><td class="num"></td></tr>
     </table>
-    ${m.holeTier.putts.afterMiss > m.holeTier.putts.afterGir
-      ? '<div class="note warn"><span class="dot"></span><span class="txt"><b>Putts after a miss exceed putts after a hit.</b> That is backwards — a chip should leave you closer than a long first putt does. Points at chip proximity rather than the putting stroke.</span></div>'
+    ${m.holeTier.putts.gapMiss != null && m.holeTier.putts.gapGir != null && m.holeTier.putts.gapMiss > m.holeTier.putts.gapGir
+      ? `<div class="note warn"><span class="dot"></span><span class="txt"><b>Putts after a miss run further from expectation than putts after a hit.</b> The miss-bucket sits ${r1(m.holeTier.putts.gapMiss) >= 0 ? '+' : ''}${r1(m.holeTier.putts.gapMiss)} over its own reference, past the hit-bucket's ${r1(m.holeTier.putts.gapGir) >= 0 ? '+' : ''}${r1(m.holeTier.putts.gapGir)}. A chip should leave you closer than a long first putt does — this points at chip proximity, not the putting stroke.</span></div>`
       : ''}
   </div>` : ''}
   <div class="sec"><h2>Priority history</h2>

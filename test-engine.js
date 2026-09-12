@@ -319,6 +319,37 @@ chk('A14 this round shows the inverted pattern that indicts chipping', (() => {
   // Healthy short game puts afterMiss BELOW afterGir. Here it is above.
   return g.afterMiss > g.afterGir;
 })());
+chk('A14 gapGir/gapMiss measure each bucket against its OWN expectation', (() => {
+  const g = puttsByGreenResult(pineRound);
+  // afterGir 7/3=2.3333, expGir 2.15 -> gap 0.1833
+  // afterMiss 37/15=2.4667, expMiss 1.95 -> gap 0.5167
+  return Math.abs(g.gapGir - (7/3 - 2.15)) < 0.001 && Math.abs(g.gapMiss - (37/15 - 1.95)) < 0.001;
+})());
+chk('A14 gapGir/gapMiss are null when the underlying mean is null', (() => {
+  const g = puttsByGreenResult([]);
+  return g.gapGir === null && g.gapMiss === null;
+})());
+chk('A14 gapMiss vs gapGir is a genuinely different comparison than raw afterMiss vs afterGir', (() => {
+  // Constructed so the raw comparison says "not inverted" (miss < hit, the
+  // expected direction) while the deviation comparison says the miss-bucket
+  // is actually further from ITS OWN norm than the hit-bucket is from its
+  // own -- exactly the case the raw comparison cannot see, since it never
+  // looks at either bucket's expectation.
+  // afterGir = (2+2+3+2+2)/5 = 2.20, gapGir = 2.20-2.15 = 0.05
+  // afterMiss = (2+2+2+2+3)/5 = 2.10, gapMiss = 2.10-1.95 = 0.15
+  const round = [{ ...mkR('2026-01-01','X',120,90,40,50,50), holeDetail: [
+    { par:4, score:5, putts:2, gir:true }, { par:4, score:5, putts:2, gir:true },
+    { par:4, score:5, putts:3, gir:true }, { par:4, score:5, putts:2, gir:true },
+    { par:4, score:5, putts:2, gir:true },
+    { par:4, score:5, putts:2, gir:false }, { par:4, score:5, putts:2, gir:false },
+    { par:4, score:5, putts:2, gir:false }, { par:4, score:5, putts:2, gir:false },
+    { par:4, score:5, putts:3, gir:false },
+  ]}];
+  const g = puttsByGreenResult(round);
+  const rawSaysNotInverted = g.afterMiss <= g.afterGir;
+  const gapSaysInverted = g.gapMiss > g.gapGir;
+  return rawSaysNotInverted && gapSaysInverted;
+})());
 chk('A14 empty input is safe and reports nulls, not zeros', (() => {
   const g = puttsByGreenResult([]);
   return g.afterGir === null && g.afterMiss === null && g.nGir === 0;
@@ -458,6 +489,12 @@ chk('A17 it reports putts after a green hit and after a miss', (() => {
 })());
 chk('A17 it names the inverted pattern as a chipping signal', (() => {
   return /chip/i.test(PA17.split('HOLE-LEVEL')[1] || '');
+})());
+chk('A17 the chip flag states the deviation from expectation, not just the raw comparison', (() => {
+  const sec = PA17.split('HOLE-LEVEL')[1] || '';
+  // Real round: gapMiss +0.52 vs gapGir +0.18 -- both should appear so the
+  // reader sees WHY it is flagged, not just that it is.
+  return /\+0\.5/.test(sec) && /\+0\.2|\+0\.1/.test(sec);
 })());
 chk('A17 it reports blow-up holes', /blow-up|double bogey or worse/i.test(PA17));
 chk('A17 the distance tier says it has no data rather than inventing a rate', (() => {
