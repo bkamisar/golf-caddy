@@ -509,7 +509,15 @@ function computeMetrics(rounds) {
   all.forEach(r => { r.suspect = r.puttsPH < 1.4; });
   const full = all.filter(r => r.holes === 18 && r.diff != null);  // headline trend corpus
   const n = full.length;
-  if (n < 3) return { all, full, enough: false };
+  const holeTier = {
+    nRounds: roundsWithDetail(all).length,
+    putts: puttsByGreenResult(all),
+    blowUps: blowUpHoles(all),
+    parType: overParByParType(all),
+    threePutt: threePuttRates(all),
+    chip: chipProximity(all),
+  };
+  if (n < 3) return { all, full, enough: false, holeTier };
 
   const diffs = full.map(r => r.diff);
   const sortedDiffs = [...diffs].sort((a, b) => a - b);
@@ -554,6 +562,11 @@ function computeMetrics(rounds) {
     slopeAll: mean(full.filter(r => r.slope).map(r => r.slope)),
     // handicap index estimate (GHIN best-of-20 method)
     hcpIndex: handicapIndex(full.map(r => r.diff)),
+    // Hole-level tier. Separate from every round-level figure above and
+    // carrying its own sample size, because it covers a small and slowly
+    // growing subset of rounds — presenting it beside a 43-round trend without
+    // that distinction would imply confidence it has not earned.
+    holeTier,
   };
   // Good-round recipe: what your career-best-decile rounds actually looked like.
   const elite = full.filter(r => r.diff <= bestDecile);
@@ -767,7 +780,7 @@ let baseline = [];   // populated by the bootstrap at the end of this script
 const loadStaging = () => { try { return JSON.parse(localStorage.getItem(LS)) || []; } catch (e) { return []; } };
 const saveStaging = rs => localStorage.setItem(LS, JSON.stringify(rs));
 // .all — mergeRounds returns {all, added}, and every caller of load() wants the array.
-const load = () => mergeRounds(baseline, loadStaging()).all;
+const load = () => attachHoleDetail(mergeRounds(baseline, loadStaging()).all, holeDetailBaseline);
 const save = rs => saveStaging(rs);
 
 // Shares data/recommendations.json with range.html, but stages under its own
@@ -780,6 +793,13 @@ let recBaseline = [];
 const loadRecStaging = () => { try { return JSON.parse(localStorage.getItem(LS_REC)) || []; } catch (e) { return []; } };
 const saveRecStaging = rs => localStorage.setItem(LS_REC, JSON.stringify(rs));
 const loadRecs = () => mergeRecommendations(recBaseline, loadRecStaging());
+
+// Hole detail is never entered through the browser — it's written directly
+// into data/hole-detail.json by Claude during a session and committed. So
+// unlike rounds and recommendations, there's no localStorage staging layer
+// here: that would just be a second, diverging way into the same file.
+const HD_URL = 'data/hole-detail.json';
+let holeDetailBaseline = [];
 // Escape any string that came from the paste before it touches innerHTML.
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -979,6 +999,10 @@ fetch(DATA_URL, { cache: 'no-store' })
   .then(r => r.ok ? r.json() : [])
   .then(d => { recBaseline = Array.isArray(d) ? d : []; })
   .catch(() => { recBaseline = []; })
+  .then(() => fetch(HD_URL, { cache: 'no-store' }))
+  .then(r => r.ok ? r.json() : [])
+  .then(d => { holeDetailBaseline = Array.isArray(d) ? d : []; })
+  .catch(() => { holeDetailBaseline = []; })
   .then(render);
 </script>
 </body>

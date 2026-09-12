@@ -413,4 +413,33 @@ chk('A15 the whole distance tier is silent on the existing data, not wrong', (()
     && chipProximity(pineRound).n === 0;
 })());
 
+// A16. computeMetrics surfaces the hole tier with its own sample sizes, and
+// never lets the smaller tier masquerade as the full round corpus.
+chk('A16 computeMetrics reports hole-tier coverage', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+    { ...mkR('2026-09-05','Pinehurst',129,99,44,17,62), holeDetail: pinehurstHoles },
+  ];
+  const m = computeMetrics(rounds);
+  return m.holeTier.nRounds === 1 && m.n === 5;
+})());
+chk('A16 the hole tier carries the rollups', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54),
+    { ...mkR('2026-09-05','Pinehurst',129,99,44,17,62), holeDetail: pinehurstHoles },
+  ];
+  const t = computeMetrics(rounds).holeTier;
+  return t.putts.nGir === 3 && t.blowUps.length === 1 && t.parType.n3 === 5;
+})());
+chk('A16 with no hole detail the tier reports zero rounds, not null', (() => {
+  const rounds = [
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54),
+  ];
+  const t = computeMetrics(rounds).holeTier;
+  return t.nRounds === 0 && t.putts.afterGir === null;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
