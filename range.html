@@ -1298,12 +1298,23 @@ function doAddRec() {
 
   let recs = loadRecs();
   const pending = lastRecommendation(recs, ['range', 'video']);
+  const today = new Date().toISOString().slice(0, 10);
+  // recKey is date+source. Closing pending and logging a new one for the SAME
+  // source on the SAME calendar day would produce two records with an
+  // identical key — mergeRecommendations is last-write-wins, so the new
+  // record would silently erase the one just closed, outcome and all. Found
+  // live: logging a second test priority the same day wiped the first
+  // entirely. Rather than change the key shape (three already-shipped
+  // components depend on date+source), block the same-day collision here.
+  if (pending && pending.date === today && pending.source === source) {
+    rm(`Already logged a priority today for "${source}" — closing it and logging another today would overwrite it. Edit that one instead, or come back after your next session.`);
+    return;
+  }
   if (pending) {
     const sel = document.getElementById('recOutcome');
     if (!sel) { rm('Could not read the outcome of the open priority.'); return; }
-    recs = closePending(recs, ['range', 'video'], sel.value, null, new Date().toISOString().slice(0, 10));
+    recs = closePending(recs, ['range', 'video'], sel.value, null, today);
   }
-  const today = new Date().toISOString().slice(0, 10);
   recs = mergeRecommendations(recs, [{
     date: today, source, priority, criterion,
     outcome: 'pending', outcomeNote: null, outcomeDate: null,
