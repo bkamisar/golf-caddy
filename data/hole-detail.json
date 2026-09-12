@@ -216,5 +216,49 @@
       { "hole": 17, "par": 4, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "Dr", "fir": true,  "driveMiss": null },
       { "hole": 18, "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "Dr", "fir": true,  "driveMiss": null }
     ]
+  },
+  {
+    "date": "2026-07-05",
+    "course": "Trillium Links and Lake Club",
+    "rating": 68.9,
+    "slope": 134,
+    "score": 111,
+    "putts": 47,
+    "girPct": 17,
+    "firPct": 77,
+    "penalties": 4.5,
+    "verified": {
+      "parSum": "36 out / 36 in / 72 total — matches card exactly",
+      "scoreSum": "54 out / 57 in / 111 total — matches card exactly, and matches data/rounds.json",
+      "puttsSum": "22 out / 25 in / 47 total — matches card exactly, and matches data/rounds.json",
+      "girCount": "1 of 9 out (11%) / 2 of 9 in (22%) / 3 of 18 total (17%) — matches data/rounds.json's gir:17 exactly",
+      "firRatio": "6/7 out, 4/6 in, 10/13 total (77%) — matches data/rounds.json's fir:77 exactly"
+    },
+    "unresolved": [
+      "Hole 6 shows 0 putts with a missed green and a par score -- consistent with a holed chip from off the green (no putt needed because the ball went straight in), not a data error.",
+      "Penalties: W (penalty area, hole 3) and O (out of bounds, hole 5) on the front nine total only 2 marked events but the card's own OUT subtotal reads 3 strokes; D (drop shot, hole 16) and S (bunker lie, hole 17) appear on the back nine. As with every prior capture, the PENALTIES row's per-hole stroke accounting does not cleanly reconcile to a per-hole count -- round-level total (4.5, matching data/rounds.json) is recorded; no per-hole penalty field exists in this schema.",
+      "Tee club was not legible for most holes in this capture (only holes 6, 8, 9, and 16 had a readable club label). fir/gir classifications come directly from the driving/GIR icons and reconcile exactly against every printed subtotal, so this does not affect confidence in those fields."
+    ],
+    "holes": [
+      { "hole": 1,  "par": 4, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": true,  "driveMiss": null },
+      { "hole": 2,  "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": true,  "driveMiss": null },
+      { "hole": 3,  "par": 4, "score": 7, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": true,  "driveMiss": null },
+      { "hole": 4,  "par": 5, "score": 8, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": false, "driveMiss": null },
+      { "hole": 5,  "par": 3, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": null,  "driveMiss": null },
+      { "hole": 6,  "par": 4, "score": 4, "putts": 0, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 7,  "par": 5, "score": 7, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": true,  "driveMiss": null },
+      { "hole": 8,  "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 9,  "par": 3, "score": 5, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "short","teeClub": "PW", "fir": null,  "driveMiss": null },
+
+      { "hole": 10, "par": 5, "score": 8, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": false, "driveMiss": "short" },
+      { "hole": 11, "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 12, "par": 5, "score": 7, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 13, "par": 3, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": null,  "driveMiss": null },
+      { "hole": 14, "par": 5, "score": 8, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": false, "driveMiss": null },
+      { "hole": 15, "par": 3, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": null, "fir": null,  "driveMiss": null },
+      { "hole": 16, "par": 3, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "7i", "fir": null,  "driveMiss": null },
+      { "hole": 17, "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": null, "fir": true,  "driveMiss": null },
+      { "hole": 18, "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": null, "fir": true,  "driveMiss": null }
+    ]
   }
 ]
