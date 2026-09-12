@@ -731,6 +731,36 @@ function coachPrompt(m, lastRec) {
     (r.putts != null ? `, putts ${r.putts}` : '') +
     (r.gir !== null ? `, GIR ${r.gir}%` : '') + (r.fir !== null ? `, FIR ${r.fir}%` : '')).join('\n');
   const confounds = roundConfounds(m);
+  const ht = m.holeTier || { nRounds: 0 };
+  const pct = v => v == null ? 'n/a' : Math.round(v * 100) + '%';
+  let holeSection = '';
+  if (ht.nRounds) {
+    const p = ht.putts;
+    const chipFlag = (p.afterGir != null && p.afterMiss != null && p.afterMiss > p.afterGir)
+      ? ' — note this is INVERTED: putts after a miss should run lower than after a hit, because a chip should finish closer than a long first putt on a green hit. Higher after a miss points at chip proximity, not the putting stroke.'
+      : '';
+    const bu = ht.blowUps;
+    const buTotal = bu.reduce((s, b) => s + b.blowUps, 0);
+    const buStrokes = bu.reduce((s, b) => s + b.strokesFromBlowUps, 0);
+    const buOver = bu.reduce((s, b) => s + b.totalOverPar, 0);
+    const distReady = ht.threePutt.filter(b => b.enough);
+    const distLine = distReady.length
+      ? distReady.map(b => `${b.label}: 3-putt ${pct(b.threePuttRate)}, 1-putt ${pct(b.onePuttRate)} (n=${b.n})`).join('; ')
+      : `not yet recorded — first-putt distance has been logged on ${ht.chip.n} hole(s), and a bucket needs ${PUTT_BUCKET_MIN_N} before any rate is reported`;
+    const chipLine = ht.chip.n
+      ? `median first putt after a green miss ${r1(ht.chip.median)} ft over ${ht.chip.n} hole(s); ` +
+        ht.chip.buckets.map(b => `${b.label} ${pct(b.share)}`).join(', ')
+      : 'no first-putt distances recorded yet';
+
+    holeSection = `
+
+HOLE-LEVEL DATA (${ht.nRounds} round(s) of the ${m.n} above — treat every figure in this block as provisional against that much smaller sample):
+- Putts after a green hit: ${r1(p.afterGir)} over ${p.nGir} hole(s). Putts after a miss: ${r1(p.afterMiss)} over ${p.nMiss} hole(s). Bogey-golfer reference: ${p.expGir} on a hit, ${p.expMiss} after a miss.${chipFlag}
+- Blow-up holes (double bogey or worse): ${buTotal} across ${ht.nRounds} round(s), accounting for ${buStrokes} of ${buOver} strokes over par.
+- Over par by hole type: par 3s ${r1(ht.parType.par3)} (n=${ht.parType.n3}), par 4s ${r1(ht.parType.par4)} (n=${ht.parType.n4}), par 5s ${r1(ht.parType.par5)} (n=${ht.parType.n5}).
+- 3-putt rate by first-putt distance: ${distLine}
+- Chip proximity: ${chipLine}`;
+  }
   const priorLine = lastRec
     ? `${lastRec.priority} (success criterion: ${lastRec.criterion}, set ${lastRec.date})`
     : 'none on record';
@@ -764,7 +794,7 @@ ${m.longAll !== null ? `- Long game (score minus putts)/hole: ${r1(m.longAll)} c
 - Ranked leaks (strokes/round): ${m.leaks.map(x => `${x.label} ${r1(x.strokes)}`).join(' · ')}
 
 LAST 5 ROUNDS:
-${rows}
+${rows}${holeSection}
 
 CONFOUNDS IN THIS SAMPLE:
 ${confounds.length ? confounds.map(c => '- ' + c).join('\n') : '- (none identified)'}`;
@@ -876,6 +906,19 @@ function render() {
     <textarea id="coach" readonly>${esc(coachPrompt(m, lastRecommendation(recs, ['round'])))}</textarea>
     <button onclick="navigator.clipboard.writeText(document.getElementById('coach').value).then(()=>msg('Copied.'))">Copy prompt</button>
   </div>
+  ${m.holeTier && m.holeTier.nRounds ? `<div class="sec"><h2>Hole-level — ${m.holeTier.nRounds} round(s)</h2>
+    <table>
+      <tr><th>Measure</th><th>Value</th><th>Reference</th></tr>
+      <tr><td>Putts after a green hit</td><td class="num">${r1(m.holeTier.putts.afterGir) ?? '–'}</td><td class="num">${m.holeTier.putts.expGir}</td></tr>
+      <tr><td>Putts after a miss</td><td class="num">${r1(m.holeTier.putts.afterMiss) ?? '–'}</td><td class="num">${m.holeTier.putts.expMiss}</td></tr>
+      <tr><td>Blow-up holes (double+)</td><td class="num">${m.holeTier.blowUps.reduce((s, b) => s + b.blowUps, 0)}</td><td class="num"></td></tr>
+      <tr><td>Over par — par 3s</td><td class="num">${r1(m.holeTier.parType.par3) ?? '–'}</td><td class="num"></td></tr>
+      <tr><td>Over par — par 4s</td><td class="num">${r1(m.holeTier.parType.par4) ?? '–'}</td><td class="num"></td></tr>
+    </table>
+    ${m.holeTier.putts.afterMiss > m.holeTier.putts.afterGir
+      ? '<div class="note warn"><span class="dot"></span><span class="txt"><b>Putts after a miss exceed putts after a hit.</b> That is backwards — a chip should leave you closer than a long first putt does. Points at chip proximity rather than the putting stroke.</span></div>'
+      : ''}
+  </div>` : ''}
   <div class="sec"><h2>Priority history</h2>
     ${recRows.length
       ? `<table><tr><th>Date</th><th>Priority</th><th>Criterion</th><th>Outcome</th><th></th></tr>${recHistHtml}</table>`

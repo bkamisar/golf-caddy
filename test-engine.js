@@ -442,4 +442,34 @@ chk('A16 with no hole detail the tier reports zero rounds, not null', (() => {
   return t.nRounds === 0 && t.putts.afterGir === null;
 })());
 
+// A17. The prompt reports the hole tier with its sample size and states the
+// putting/chipping split in the terms the spec settled on.
+const A17rounds = [
+  mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+  mkR('2026-07-10','A',123,104,46,17,54), mkR('2026-07-19','B',123,98,38,11,46),
+  { ...mkR('2026-09-05','Pinehurst',129,99,44,17,62), holeDetail: pinehurstHoles },
+];
+const PA17 = coachPrompt(computeMetrics(A17rounds));
+
+chk('A17 the prompt has a hole-level section', /HOLE-LEVEL/.test(PA17));
+chk('A17 it states how many rounds back the hole tier', /1 round/.test(PA17));
+chk('A17 it reports putts after a green hit and after a miss', (() => {
+  return /after a green hit/i.test(PA17) && /after a miss/i.test(PA17);
+})());
+chk('A17 it names the inverted pattern as a chipping signal', (() => {
+  return /chip/i.test(PA17.split('HOLE-LEVEL')[1] || '');
+})());
+chk('A17 it reports blow-up holes', /blow-up|double bogey or worse/i.test(PA17));
+chk('A17 the distance tier says it has no data rather than inventing a rate', (() => {
+  const sec = PA17.split('HOLE-LEVEL')[1] || '';
+  return /not yet recorded|no first-putt/i.test(sec);
+})());
+chk('A17 no hole-level section at all when no round carries detail', (() => {
+  const plain = computeMetrics([
+    mkR('2026-07-05','A',123,111,47,17,77), mkR('2026-07-08','A',123,102,38,12,62),
+    mkR('2026-07-10','A',123,104,46,17,54),
+  ]);
+  return !/HOLE-LEVEL/.test(coachPrompt(plain));
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
