@@ -241,29 +241,51 @@ forward. This is the single most valuable field available here, because it
 splits the current top leak — "putting + chip proximity," 8.3 strokes/round —
 into its two component skills:
 
-- **Putting**, isolated: putts taken versus expected *for that distance*.
+- **Putting**, isolated: how often a putt is 3-putted *from a given distance*.
   Three-putting from 40 feet is unremarkable; three-putting from 12 feet is a
   putting problem. Round-level putts/hole cannot tell these apart.
-- **Short game**, isolated: first-putt distance following a green miss, versus
-  a baseline. Chips finishing 25 feet away produce "bad putting" numbers that
-  are actually a chipping failure.
+- **Short game**, isolated: how far the first putt is left following a green
+  miss. Chips finishing 25 feet away produce "bad putting" numbers that are
+  actually a chipping failure.
 
-**Baseline choice matters and can mislead — resolved 2026-09-11: self-calibrating,
-not imported.** Expected-putts-by-distance curves are usually published for
-scratch or tour players; scoring a bogey-plus golfer against one makes putting
-look catastrophic regardless of true performance, and no legitimately
-bogey-golfer-calibrated curve is available to import — inventing one would just
-be a guess wearing a baseline's clothes.
+**How the split is measured — resolved 2026-09-11, after one false start.**
 
-Instead the app builds its own expected-putts-by-distance table from the user's
-own accumulating first-putt-distance data, bucketed by distance, mirroring the
-`lowConfidence` pattern already used in `computeGapping` (fewer than 5 clean
-shots per club). A distance bucket reports a strokes-leak estimate only once it
-has enough holes behind it; below that it shows the raw distance/trend with no
-leak claim. This is slower to produce a number than importing a curve would be,
-but it is consistent with how blow-up holes are already judged — against the
-user's own history, never an absolute standard — and it can never be wrong in
-the specific way a borrowed tour curve would be.
+Two approaches were considered and rejected before landing on the third.
+
+*Rejected: an imported expected-putts-by-distance curve.* Published curves are
+scratch- or tour-calibrated; scoring a bogey-plus golfer against one makes
+putting look catastrophic regardless of true performance. No legitimately
+bogey-golfer-calibrated curve is available to import, and inventing one would be
+a guess wearing a baseline's clothes — the exact mistake the existing
+bogey-golfer GIR norms (2.15 / 1.95) were built to avoid.
+
+*Rejected: a self-calibrating expected-putts table built from the user's own
+data.* This was approved first and is **circular**: if expected putts from 12
+feet is defined as the user's own average from 12 feet, then putts-vs-expected
+sums to exactly zero by construction. It measures nothing. It would work for
+trend if the baseline period and comparison period were split temporally, but
+not for the thing this data was collected to do — decomposing a leak.
+
+*Adopted: two directly-interpretable rates, neither needing a baseline curve.*
+
+- **Chipping quality** — the distribution of first-putt distance following a
+  green miss. "Chips finish beyond 30 feet 60% of the time" is actionable with
+  no external reference at all; it is a description, not a comparison.
+- **Putting quality** — **3-putt rate conditional on distance bucket** (and
+  1-putt rate alongside it). This has the one legitimate non-arbitrary anchor
+  available: two putts is regulation, by definition of the game, not by
+  reference to any population of golfers. A 3-putt rate from inside 10 feet is
+  damning without needing to know what anyone else shoots.
+
+Together these answer the actionable question — *practice putting or chipping?*
+— which the fused 8.3-stroke figure cannot. What they deliberately give up is a
+single headline "X strokes lost to putting" number for the split. That number
+was never obtainable honestly without an external baseline, and the round-level
+leak ranking still reports the fused version for continuity.
+
+Bucket boundaries and the minimum sample per bucket before a rate is reported
+are implementation decisions for the plan; the `lowConfidence` pattern in
+`computeGapping` (fewer than 5 clean shots per club) is the precedent to follow.
 
 **This creates a third data tier.** Rollups must not silently mix them:
 
@@ -341,8 +363,13 @@ extraction is deterministic run to run.
   Claude writes `data/hole-detail/*.json` directly during a session and commits.
 - Penalty capture — Grint's PENALTIES row semantics are still unresolved (open
   question 3). Driving-miss severity is no longer deferred; see Phase 3.
-- An imported expected-putts-by-distance curve. Superseded 2026-09-11 — the
-  baseline is self-calibrated from the user's own data instead.
+- Any expected-putts-by-distance curve, imported or self-calibrated. The
+  imported kind is not available bogey-calibrated; the self-calibrated kind is
+  circular and measures nothing. Replaced by 3-putt rate by distance bucket and
+  post-miss first-putt distance — see Phase 3.
+- A single "X strokes lost to putting" figure for the putting/chipping split.
+  Not obtainable honestly without an external baseline; the round-level leak
+  ranking still reports the fused version.
 - Backfilling hole detail for the existing 31 rounds.
 - Writing data from the phone; it remains read-only.
 
@@ -355,8 +382,10 @@ extraction is deterministic run to run.
    `data/hole-detail/2026-09-05-pinehurst-10.json`.
 2. ~~What populates Grint's DISTANCE (ft) row, and what baseline should it be
    judged against?~~ **Resolved 2026-09-11** — it is first-putt distance,
-   recorded going forward. Baseline is self-calibrating from the user's own
-   data, not an imported curve — see the Phase 3 section above.
+   recorded going forward. No baseline curve is used at all: the split is
+   measured as 3-putt rate by distance bucket (anchored to two-putt regulation)
+   plus post-miss first-putt distance. A self-calibrated curve was approved
+   first and then rejected as circular — see the Phase 3 section above.
 3. Grint's **PENALTIES** row is mixed-use — it carries lie codes (`S` =
    greenside bunker) alongside penalty counts, and the sample round totals
    `0.5` rather than a whole number. Still open; penalty capture stays
