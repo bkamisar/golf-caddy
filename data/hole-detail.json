@@ -44,5 +44,46 @@
       { "hole": 17, "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "PW",  "fir": null,  "driveMiss": null },
       { "hole": 18, "par": 4, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "Dr",  "fir": true,  "driveMiss": null }
     ]
+  },
+  {
+    "date": "2026-09-07",
+    "course": "#1 | Pinehurst Resort",
+    "rating": 66.2,
+    "slope": 115,
+    "score": 71,
+    "putts": 31,
+    "girPct": 8,
+    "firPct": 63,
+    "penalties": 0,
+    "verified": {
+      "parSum": "34 out (holes 1-9) — matches card's OUT subtotal",
+      "scoreSum": "52 out (holes 1-9) + 19 (holes 10-13) = 71 total — matches the round already recorded in data/rounds.json from a separate paste weeks earlier",
+      "puttsSum": "24 out (holes 1-9) + 7 (holes 10-13) = 31 total — matches data/rounds.json exactly",
+      "girCount": "1 of 13 (hole 1) = 8% (self-computed; Grint's own round-level record stores gir:6, which appears to divide by 18 rather than the 13 holes actually played on this stopped-short round)",
+      "firRatio": "OUT screen printed 2/6 for holes 1-9, matching my hole-by-hole read exactly; full-round figure below is self-computed over the 8 confidently-classified Dr holes (5 hit)"
+    },
+    "unresolved": [
+      "Round stopped after 13 holes (walked off); holes 14-18 have no data.",
+      "Hole 4's driving icon is a single up-arrow, not previously seen. Recorded as fir:null rather than guessed true/false — excluded from the firPct calculation above.",
+      "Hole 7's driving row shows a down-arrow, unlike holes 5/9/12 (also par 3s, correctly blank) — inconsistent with the established pattern of no driving icon on a par 3. Recorded as fir:null, driveMiss:null rather than assumed.",
+      "Hole 12's GIR icon is a double-chevron (»), previously seen only in the DRIVING row (meaning 'severe' miss). Its meaning in the GIR row is new and unclear; recorded generically as girMiss:'miss' rather than inventing a new category.",
+      "firstPuttFt is null throughout — not yet recorded going forward at the time of this round."
+    ],
+    "holes": [
+      { "hole": 1,  "par": 4, "score": 6, "putts": 4, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 2,  "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": false, "driveMiss": null },
+      { "hole": 3,  "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": false, "driveMiss": "severe" },
+      { "hole": 4,  "par": 5, "score": 8, "putts": 4, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": null,  "driveMiss": null },
+      { "hole": 5,  "par": 3, "score": 6, "putts": 4, "firstPuttFt": null, "gir": false, "girMiss": "short","teeClub": "9i", "fir": null,  "driveMiss": null },
+      { "hole": 6,  "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": false, "driveMiss": "severe" },
+      { "hole": 7,  "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "short","teeClub": "7i", "fir": null,  "driveMiss": null },
+      { "hole": 8,  "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 9,  "par": 3, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "short","teeClub": "8i", "fir": null,  "driveMiss": null },
+
+      { "hole": 10, "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 11, "par": 4, "score": 4, "putts": 1, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 12, "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "5H", "fir": null,  "driveMiss": null },
+      { "hole": 13, "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null }
+    ]
   }
 ]
