@@ -1,17 +1,17 @@
 # ⛳ Golf Caddy — Grint Analyzer
 
 Paste your (free-tier) Grint scores table → honest trends, one evidence-backed
-practice focus, and a "team of coaches" debrief prompt for Claude. Single static
-page, everything stays in your browser (localStorage). No account, no API key.
+practice focus, and a structured analyst debrief prompt for Claude. Single
+static page, everything stays in your browser (localStorage). No account, no
+API key.
 
 ## Use it
 
 1. On The Grint: **Stats → Scores** → select the whole table → copy.
 2. Open the page → paste → **Parse & save**. Re-pasting later is safe
    (duplicates merge by date+course+score).
-3. Read the verdicts; **Copy prompt** to debrief with the four coaches
-   (Faldo/Bryson/Faxon/Phil) in the Claude app — they argue from your real
-   computed numbers, not vibes.
+3. Read the verdicts; **Copy prompt** and paste it into Claude for a
+   structured debrief grounded in your real computed numbers, not vibes.
 4. **Export JSON** occasionally — localStorage is per-browser.
 
 ## Deploy (GitHub Pages)
@@ -92,8 +92,8 @@ vice versa.
 2. Open `range.html` → optionally set ball/venue/temp tags for the visit →
    paste → **Parse & save**. One paste = one club on one date; do this once per
    club you hit. Re-pasting is safe — duplicate shots merge.
-3. Read the verdicts and gapping table; **Copy prompt** to debrief with the same
-   four coaches, grounded in your clean-shot yardages.
+3. Read the verdicts and gapping table; **Copy prompt** for the same
+   structured debrief, grounded in your clean-shot yardages.
 
 **Why clean-shot median, not Trackman's on-screen average:** the average
 includes duffs. A shot is quarantined as a mishit if its smash factor is below
@@ -161,11 +161,44 @@ Every session needs a date. No CSV export supplies one, so the form has a date
 field and will refuse a paste without it — undated sessions all collapse into a
 single bucket and make trends impossible.
 
-`course.html`'s on-course yardage ladder always shows exactly one source at a
-time (defaulting to whichever has the most recent data), since a ladder
-blending two instruments' carries would produce a number matching neither —
-not something to club off of on the tee. `range.html` allows an "All sources"
-view for broader analysis.
+Both `course.html`'s yardage ladder and `range.html`'s gapping table always
+show exactly one source at a time (defaulting to whichever has the most recent
+data), since a number blending two instruments' carries would match neither —
+not something to club off of on the tee, and not something to trend against
+either. There is no "all sources" view; a source picker lets you switch
+between them, one at a time.
+
+## The practice loop
+
+Each coach debrief opens with a continuity check, because the app remembers
+what it told you last time.
+
+1. Copy the debrief prompt into Claude and read what comes back.
+2. It ends with one priority and a numeric success criterion. Log both under
+   **Log a practice priority**.
+3. Practice. Paste the new session.
+4. The next debrief opens by asking whether you met that criterion. Record the
+   answer when you log the next priority — one form does both.
+
+A priority stays open until you close it, and only one can be open per source
+at a time. That is deliberate: the continuity check has to be answerable, and
+three simultaneous open priorities make it a guess.
+
+### Swing findings
+
+`data/findings.json` holds standing observations about your swing — early
+extension, weight transfer, and so on — from video analysis. They persist until
+resolved, so a video session never needs to line up with a range session.
+
+These are written by Claude during a video-analysis session, not typed into the
+app. Send the clips, and the findings are written into the repo and committed.
+Each carries a confidence level, and a finding recorded from a camera angle
+that cannot support it is automatically downgraded to speculative — a front-on
+clip cannot establish swing plane, and the app will not pretend otherwise.
+
+Video establishes positions and mechanism. Ball flight comes only from the
+launch monitor. The prompt states this rule explicitly so the two are never
+conflated.
 
 ## Opening the files directly
 
