@@ -19,6 +19,25 @@ API key.
 Publish this repo via GitHub Desktop → repo Settings → Pages → deploy from
 `main` root. Then bookmark it on your phone for the course.
 
+## Give it to a friend
+
+Nothing in the code is tied to one person — no hardcoded name, repo link, or
+account. A fork is a complete, independent copy; the only thing that carries
+over is whatever is sitting in `data/`.
+
+1. **Fork this repo** on GitHub (their own account, their own copy).
+2. **Reset the data files** so their copy starts blank instead of inheriting
+   this one's rounds and range sessions. On their fork, open each file under
+   `data/` — `rounds.json`, `range.json`, `recommendations.json`,
+   `findings.json`, `hole-detail.json` — in GitHub's web editor, replace the
+   contents with `[]`, and commit.
+3. **Enable Pages** on their fork the same way as above.
+4. Bookmark their own Pages URL. From there it's fully independent: their own
+   browser storage, their own commits, their own data.
+
+No code changes needed — the pages don't know or care whose data they're
+showing.
+
 ## How the analytics think (design notes)
 
 - **Distributions, not averages.** Averages hide bimodal changes (the July 2026
