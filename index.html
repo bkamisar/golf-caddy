@@ -359,6 +359,69 @@ function roundsWithDetail(rounds) {
   return (rounds || []).filter(r => Array.isArray(r.holeDetail) && r.holeDetail.length);
 }
 
+// Putts conditional on whether the green was hit. The existing bogey-golfer
+// norms encode the expectation that putts after a MISS run LOWER than after a
+// hit: you chip on close and one- or two-putt, where a green in regulation
+// often leaves a long first putt. When the miss number is HIGHER, chips are not
+// finishing close, and what presents as a putting problem is a chipping
+// problem. Needs only par/score/putts/GIR, so it works on every hole-level
+// round from the first one.
+function puttsByGreenResult(rounds) {
+  const hit = [], miss = [];
+  roundsWithDetail(rounds).forEach(r => {
+    r.holeDetail.forEach(h => {
+      if (!h || h.putts == null) return;
+      (h.gir ? hit : miss).push(h.putts);
+    });
+  });
+  return {
+    afterGir: hit.length ? mean(hit) : null,
+    afterMiss: miss.length ? mean(miss) : null,
+    nGir: hit.length, nMiss: miss.length,
+    // Returned rather than read from the consts by callers/tests: these are
+    // `const` in this engine block and do not survive the test harness's eval.
+    expGir: EXP_PUTT_GIR, expMiss: EXP_PUTT_MISS,
+  };
+}
+
+// Double bogey or worse. Counted per round so the trend is against the user's
+// own history rather than an absolute standard — "four holes were 45% of my
+// strokes over par" is close to arithmetic for any high handicap and means
+// nothing without that self-comparison.
+function blowUpHoles(rounds) {
+  return roundsWithDetail(rounds).map(r => {
+    const scored = r.holeDetail.filter(h => h && h.par != null && h.score != null);
+    if (!scored.length) return null;
+    const over = scored.map(h => h.score - h.par);
+    const blow = over.filter(v => v >= 2);
+    return {
+      date: r.date, course: r.course, holes: scored.length,
+      blowUps: blow.length,
+      strokesFromBlowUps: blow.reduce((s, v) => s + v, 0),
+      totalOverPar: over.reduce((s, v) => s + v, 0),
+    };
+  }).filter(Boolean);
+}
+
+// Over-par by par type. Par 3s have no drive, so FIR never applies to them and
+// their approach play is otherwise diluted into the same bucket as par 4s and
+// 5s. Splitting them is the only way to see iron play separately from what the
+// tee shot set up.
+function overParByParType(rounds) {
+  const byPar = { 3: [], 4: [], 5: [] };
+  roundsWithDetail(rounds).forEach(r => {
+    r.holeDetail.forEach(h => {
+      if (!h || h.par == null || h.score == null) return;
+      if (byPar[h.par]) byPar[h.par].push(h.score - h.par);
+    });
+  });
+  return {
+    par3: byPar[3].length ? mean(byPar[3]) : null, n3: byPar[3].length,
+    par4: byPar[4].length ? mean(byPar[4]) : null, n4: byPar[4].length,
+    par5: byPar[5].length ? mean(byPar[5]) : null, n5: byPar[5].length,
+  };
+}
+
 function computeMetrics(rounds) {
   // NEVER trust caller order (a newest-first paste fed directly would silently
   // reverse every "recent vs baseline" comparison — caught in the 2026-07 stress test).

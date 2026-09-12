@@ -285,4 +285,72 @@ chk('A13 roundsWithDetail filters to only rounds carrying detail', (() => {
   return roundsWithDetail(out).length === 1;
 })());
 
+// A14. Rollups computable from par/score/putts/GIR alone — no first-putt
+// distance required, so they produce signal from the first captured round.
+const pinehurstHoles = [
+  { hole:1,  par:4, score:5, putts:2, gir:false }, { hole:2,  par:3, score:4, putts:3, gir:true  },
+  { hole:3,  par:5, score:7, putts:3, gir:false }, { hole:4,  par:4, score:4, putts:2, gir:true  },
+  { hole:5,  par:4, score:4, putts:1, gir:false }, { hole:6,  par:4, score:6, putts:3, gir:false },
+  { hole:7,  par:3, score:6, putts:3, gir:false }, { hole:8,  par:4, score:6, putts:3, gir:false },
+  { hole:9,  par:4, score:5, putts:2, gir:false }, { hole:10, par:5, score:8, putts:3, gir:false },
+  { hole:11, par:3, score:6, putts:2, gir:false }, { hole:12, par:5, score:5, putts:2, gir:true  },
+  { hole:13, par:4, score:5, putts:2, gir:false }, { hole:14, par:3, score:4, putts:2, gir:false },
+  { hole:15, par:4, score:8, putts:3, gir:false }, { hole:16, par:4, score:6, putts:3, gir:false },
+  { hole:17, par:3, score:4, putts:2, gir:false }, { hole:18, par:4, score:6, putts:3, gir:false },
+];
+const pineRound = [{ ...mkR('2026-09-05','Pinehurst',129,99,44,17,62), holeDetail: pinehurstHoles }];
+
+chk('A14 putts after a green hit, computed over the real round', (() => {
+  const g = puttsByGreenResult(pineRound);
+  // holes 2, 4, 12 were hit: putts 3, 2, 2 -> 2.333...
+  return g.nGir === 3 && Math.abs(g.afterGir - 7 / 3) < 0.01;
+})());
+chk('A14 putts after a green miss, computed over the real round', (() => {
+  const g = puttsByGreenResult(pineRound);
+  // the other 15 holes total 37 putts -> 2.466...
+  return g.nMiss === 15 && Math.abs(g.afterMiss - 37 / 15) < 0.01;
+})());
+chk('A14 the norms come back in the result so tests never touch the consts', (() => {
+  const g = puttsByGreenResult(pineRound);
+  return g.expGir === 2.15 && g.expMiss === 1.95;
+})());
+chk('A14 this round shows the inverted pattern that indicts chipping', (() => {
+  const g = puttsByGreenResult(pineRound);
+  // Healthy short game puts afterMiss BELOW afterGir. Here it is above.
+  return g.afterMiss > g.afterGir;
+})());
+chk('A14 empty input is safe and reports nulls, not zeros', (() => {
+  const g = puttsByGreenResult([]);
+  return g.afterGir === null && g.afterMiss === null && g.nGir === 0;
+})());
+
+chk('A14 blow-up holes counted as double bogey or worse', (() => {
+  const b = blowUpHoles(pineRound)[0];
+  // +2 or worse on holes 3,6,7,8,10,11,15,16,18 = 9 holes
+  return b.blowUps === 9 && b.holes === 18;
+})());
+chk('A14 strokes attributable to blow-ups, and total over par', (() => {
+  const b = blowUpHoles(pineRound)[0];
+  return b.strokesFromBlowUps === 23 && b.totalOverPar === 29;
+})());
+chk('A14 blowUpHoles skips rounds with no detail rather than emitting zeros', (() => {
+  return blowUpHoles([mkR('2026-09-05','Pinehurst',129,99,44,17,62)]).length === 0;
+})());
+
+chk('A14 over-par split by par type isolates par-3 play', (() => {
+  const p = overParByParType(pineRound);
+  // par 3s: holes 2,7,11,14,17 -> +1,+3,+3,+1,+1 = 9/5 = 1.8
+  return p.n3 === 5 && Math.abs(p.par3 - 1.8) < 0.01;
+})());
+chk('A14 par 4 and par 5 buckets are reported separately', (() => {
+  const p = overParByParType(pineRound);
+  return p.n4 === 10 && p.n5 === 3 && p.par4 != null && p.par5 != null;
+})());
+chk('A14 a par type with no holes reports null, not NaN', (() => {
+  const only3s = [{ ...mkR('2026-01-01','X',113,30,10,0,0),
+    holeDetail: [{ hole:1, par:3, score:4, putts:2, gir:false }] }];
+  const p = overParByParType(only3s);
+  return p.par4 === null && p.n4 === 0;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
