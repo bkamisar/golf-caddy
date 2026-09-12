@@ -241,4 +241,48 @@ chk('A12 the rounds prompt renders a logged priority', (() => {
   return p.includes('Lag putting from 30 feet') && !p.includes('none on record');
 })());
 
+// A13. Hole detail is stored as one array and joined to rounds by date+course.
+const mkHD = (date, course, holes) => ({ date, course, holes });
+const hd3 = [
+  { hole: 1, par: 4, score: 5, putts: 2, gir: false, firstPuttFt: 18 },
+  { hole: 2, par: 3, score: 4, putts: 3, gir: true,  firstPuttFt: 30 },
+  { hole: 3, par: 5, score: 7, putts: 3, gir: false, firstPuttFt: 40 },
+];
+
+chk('A13 holeDetailKey is date plus normalized course', (() => {
+  return holeDetailKey('2026-09-05', '  Pinehurst   Resort ') === '2026-09-05|Pinehurst Resort';
+})());
+chk('A13 attachHoleDetail attaches by matching date+course', (() => {
+  const rounds = [mkR('2026-09-05','Pinehurst',129,99,44,17,62)];
+  const out = attachHoleDetail(rounds, [mkHD('2026-09-05','Pinehurst',hd3)]);
+  return out[0].holeDetail && out[0].holeDetail.length === 3;
+})());
+chk('A13 a round with no matching detail gets no holeDetail field set', (() => {
+  const rounds = [mkR('2026-09-05','Pinehurst',129,99,44,17,62)];
+  const out = attachHoleDetail(rounds, [mkHD('2026-01-01','Elsewhere',hd3)]);
+  return out[0].holeDetail == null;
+})());
+chk('A13 attach does not mutate the input rounds', (() => {
+  const rounds = [mkR('2026-09-05','Pinehurst',129,99,44,17,62)];
+  attachHoleDetail(rounds, [mkHD('2026-09-05','Pinehurst',hd3)]);
+  return rounds[0].holeDetail === undefined;
+})());
+chk('A13 r.holes (the hole COUNT) is not clobbered by the detail array', (() => {
+  const rounds = [mkR('2026-09-05','Pinehurst',129,99,44,17,62)];
+  const out = attachHoleDetail(rounds, [mkHD('2026-09-05','Pinehurst',hd3)]);
+  return out[0].holes === 18 && Array.isArray(out[0].holeDetail);
+})());
+chk('A13 empty and undefined inputs are safe', (() => {
+  return attachHoleDetail([], []).length === 0
+    && attachHoleDetail(undefined, undefined).length === 0;
+})());
+chk('A13 roundsWithDetail filters to only rounds carrying detail', (() => {
+  const rounds = [
+    mkR('2026-09-05','Pinehurst',129,99,44,17,62),
+    mkR('2026-09-06','Elsewhere',129,101,45,12,60),
+  ];
+  const out = attachHoleDetail(rounds, [mkHD('2026-09-05','Pinehurst',hd3)]);
+  return roundsWithDetail(out).length === 1;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

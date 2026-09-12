@@ -331,6 +331,34 @@ function handicapIndex(diffs) {
   return mean(best) * 0.96 + adj;
 }
 
+// ── Hole-level detail ────────────────────────────────────────────────────────
+// Stored as one array in data/hole-detail.json rather than a file per round:
+// GitHub Pages cannot list a directory, so per-round files would need a
+// manifest, and a manifest is one more thing that can drift out of sync with
+// the files it names.
+//
+// Joined to rounds by date + course. Two rounds at the same course on the same
+// day would collide; that is a 36-hole day, has not happened in 43 rounds, and
+// is left unhandled deliberately rather than carrying a synthetic id around.
+function holeDetailKey(date, course) {
+  return `${date}|${(course || '').replace(/\s+/g, ' ').trim()}`;
+}
+
+// Returns a new array; never mutates. The attached field is `holeDetail` --
+// NOT `holes`, which already means the hole COUNT (18 / 9 / 13) on a round.
+function attachHoleDetail(rounds, details) {
+  const byKey = {};
+  (details || []).forEach(d => { byKey[holeDetailKey(d.date, d.course)] = d; });
+  return (rounds || []).map(r => {
+    const d = byKey[holeDetailKey(r.date, r.course)];
+    return d && Array.isArray(d.holes) ? { ...r, holeDetail: d.holes } : { ...r };
+  });
+}
+
+function roundsWithDetail(rounds) {
+  return (rounds || []).filter(r => Array.isArray(r.holeDetail) && r.holeDetail.length);
+}
+
 function computeMetrics(rounds) {
   // NEVER trust caller order (a newest-first paste fed directly would silently
   // reverse every "recent vs baseline" comparison — caught in the 2026-07 stress test).
