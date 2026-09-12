@@ -204,20 +204,30 @@ migrating so nothing is stranded.
 
 Largest scope, most workflow risk, independent of Phases 1–2 beyond storage.
 
-**Entry workflow.** A static page cannot do vision extraction, and an API key
-cannot be embedded in a public repo. Client-side OCR is rejected: a scorecard is
-a dense grid of small digits, misreads are likely, and wrong scores are worse
-than no scores. The workflow is therefore Claude extracts → JSON → paste into
-the tool, supported by:
+**Entry workflow — revised 2026-09-11, simpler than originally specced.** A
+static page cannot do vision extraction, and an API key cannot be embedded in a
+public repo, so the extraction step always required a Claude session. The
+original design still routed the result back through an in-app paste-and-confirm
+UI. The user instead asked Claude to write the extracted data straight into the
+repo and commit it — no round-trip through the app at all.
 
-- A documented, reusable extraction prompt emitting exactly the schema above.
-- A **paste-and-confirm** import: parse, render all 18 holes as a table, and
-  require visual confirmation against the screenshot before saving. Vision
-  extraction will occasionally misread a digit, and a silently wrong 7 poisons
-  every rollup built on it.
+Workflow: user sends scorecard screenshots in a Claude Code session → Claude
+extracts the data, cross-checks it against the card's own printed subtotals
+(par/score/putts/GIR sums, exactly as done for the first sample capture) →
+writes `data/hole-detail/<date>-<course-slug>.json` → commits. The user pushes.
 
-**Schema** — per hole: par, score, putts, GIR (with miss type), FIR, tee club,
-and drive-miss direction/severity.
+This replaces the in-app confirm step's purpose (catching a misread before it
+poisons a rollup) with the subtotal cross-check, which is arguably stronger — it
+verifies against numbers Grint itself computed, not against the user's own
+re-reading of a screenshot they already looked at once. No paste-and-confirm UI
+is built. The cost: hole-level entry only happens inside a Claude session, not
+standalone — accepted, since that is the workflow the user actually wants.
+
+**Schema** — per hole: par, score, putts, first-putt distance (feet), GIR (with
+miss type), FIR, tee club, and drive-miss direction/severity. Field names
+follow the existing sample capture's convention
+(`data/hole-detail/2026-09-05-pinehurst-10.json`): `firstPuttFt`, `girMiss`,
+`teeClub`, `driveMiss`.
 
 Driving-miss severity was originally deferred here on the grounds that it
 depends on unreliable after-the-fact recall. **Screenshots reviewed 2026-09-11
@@ -238,13 +248,22 @@ into its two component skills:
   a baseline. Chips finishing 25 feet away produce "bad putting" numbers that
   are actually a chipping failure.
 
-**Baseline choice matters and can mislead.** Expected-putts-by-distance curves
-are usually published for scratch or tour players; scoring a bogey-plus golfer
-against one makes putting look catastrophic regardless of true performance. The
-app already sets this precedent correctly elsewhere, using bogey-golfer norms
-(2.15 putts on greens hit, 1.95 after a miss) so low-GIR rounds are not
-miscounted as bad putting. The distance curve must be bogey-golfer calibrated
-for the same reason.
+**Baseline choice matters and can mislead — resolved 2026-09-11: self-calibrating,
+not imported.** Expected-putts-by-distance curves are usually published for
+scratch or tour players; scoring a bogey-plus golfer against one makes putting
+look catastrophic regardless of true performance, and no legitimately
+bogey-golfer-calibrated curve is available to import — inventing one would just
+be a guess wearing a baseline's clothes.
+
+Instead the app builds its own expected-putts-by-distance table from the user's
+own accumulating first-putt-distance data, bucketed by distance, mirroring the
+`lowConfidence` pattern already used in `computeGapping` (fewer than 5 clean
+shots per club). A distance bucket reports a strokes-leak estimate only once it
+has enough holes behind it; below that it shows the raw distance/trend with no
+leak claim. This is slower to produce a number than importing a curve would be,
+but it is consistent with how blow-up holes are already judged — against the
+user's own history, never an absolute standard — and it can never be wrong in
+the specific way a borrowed tour curve would be.
 
 **This creates a third data tier.** Rollups must not silently mix them:
 
@@ -272,10 +291,14 @@ distribution is skewed by construction. Define the metric concretely
 (double-bogey-or-worse count) and trend it against the user's own history, not
 an absolute standard.
 
-**Consistency risk.** If logging is not near-frictionless it will happen only
-for memorable rounds — great ones and disasters — biasing every rollup. If the
-confirm-and-paste flow proves annoying in practice, dropping this phase is
-better than collecting a biased sample.
+**Consistency risk — reframed by the workflow change.** The original risk was
+an in-app flow being annoying enough to skip. That flow no longer exists; the
+live risk now is that hole-level capture only happens when the user thinks to
+send screenshots inside a Claude session, which skews toward rounds worth
+talking about — the same memorable-rounds bias, different cause. Nothing in the
+implementation fixes this; it is a standing limitation of the distance-aware and
+hole-level tiers, which is exactly why they report their own sample size rather
+than borrowing the round-level tier's.
 
 ## Companion — video analysis skill
 
@@ -314,7 +337,12 @@ extraction is deterministic run to run.
 - Cross-source calibration offsets.
 - Client-side OCR or any embedded API key.
 - Video analysis inside the app or inside an Artifact.
-- Driving-miss severity and penalty capture (deferred from Phase 3).
+- An in-app hole-detail import UI (paste-and-confirm). Superseded 2026-09-11 —
+  Claude writes `data/hole-detail/*.json` directly during a session and commits.
+- Penalty capture — Grint's PENALTIES row semantics are still unresolved (open
+  question 3). Driving-miss severity is no longer deferred; see Phase 3.
+- An imported expected-putts-by-distance curve. Superseded 2026-09-11 — the
+  baseline is self-calibrated from the user's own data instead.
 - Backfilling hole detail for the existing 31 rounds.
 - Writing data from the phone; it remains read-only.
 
@@ -325,19 +353,25 @@ extraction is deterministic run to run.
    accuracy with miss direction and severity, and tee club, all per hole.
    Phase 3 is well-supported. A sample extraction is checked in at
    `data/hole-detail/2026-09-05-pinehurst-10.json`.
-2. ~~What populates Grint's DISTANCE (ft) row?~~ **Resolved 2026-09-11** — it
-   is first-putt distance, and will be recorded going forward. Remaining
-   sub-question: which bogey-golfer expected-putts-by-distance curve to use as
-   the baseline. Source it before Phase 3 implementation; a tour-calibrated
-   curve would systematically misrepresent putting performance.
+2. ~~What populates Grint's DISTANCE (ft) row, and what baseline should it be
+   judged against?~~ **Resolved 2026-09-11** — it is first-putt distance,
+   recorded going forward. Baseline is self-calibrating from the user's own
+   data, not an imported curve — see the Phase 3 section above.
 3. Grint's **PENALTIES** row is mixed-use — it carries lie codes (`S` =
    greenside bunker) alongside penalty counts, and the sample round totals
-   `0.5` rather than a whole number. Resolve these semantics before any rollup
-   consumes penalties.
-4. Does `course.html` need findings and the current priority on the phone, or
-   is the yardage ladder still the whole job on-course?
-5. Should `index.html` (rounds) and `range.html` (shots) share one
-   recommendations view, or does each show only its own source?
+   `0.5` rather than a whole number. Still open; penalty capture stays
+   deferred until resolved (see Out of scope).
+4. ~~Does `course.html` need findings and the current priority on the phone?~~
+   **Resolved by the Phase 2b build** — no. Findings were deliberately kept
+   off that page: it is an on-course yardage reference, and swing-mechanics
+   findings do not belong in that moment. `course.html` shows no
+   recommendations either.
+5. ~~Should `index.html` and `range.html` share one recommendations view?~~
+   **Resolved by the Phase 2b build** — no. Each shows only its own
+   source-scoped history (`round` on the rounds page; `range`/`video` on the
+   range page), reading the same committed `data/recommendations.json` but
+   staged under separate localStorage keys so the two pages' unsaved edits
+   cannot collide.
 
 ## Testing
 
