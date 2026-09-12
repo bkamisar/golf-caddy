@@ -353,4 +353,64 @@ chk('A14 a par type with no holes reports null, not NaN', (() => {
   return p.par4 === null && p.n4 === 0;
 })());
 
+// A15. Distance-aware rollups. No baseline curve: 3-putt rate is anchored to
+// two-putt regulation, and chip proximity is a description rather than a
+// comparison. Rates below the minimum sample are withheld, not shown noisy.
+const distHole = (ft, putts, gir) => ({ par: 4, score: 5, putts, gir, firstPuttFt: ft });
+const mkDistRound = (holes) => ({ ...mkR('2026-10-01','Somewhere',120,95,40,20,60), holeDetail: holes });
+
+chk('A15 puttBucket sorts distances into the three buckets', (() => {
+  return puttBucket(4) === 'under10' && puttBucket(10) === '10to25'
+    && puttBucket(24) === '10to25' && puttBucket(25) === 'over25' && puttBucket(60) === 'over25';
+})());
+chk('A15 puttBucket rejects null and non-numeric', (() => {
+  return puttBucket(null) === null && puttBucket(undefined) === null && puttBucket(NaN) === null;
+})());
+
+chk('A15 a bucket under the minimum sample withholds its rate', (() => {
+  const rounds = [mkDistRound([distHole(5, 3, true), distHole(6, 2, true)])];
+  const b = threePuttRates(rounds).find(x => x.key === 'under10');
+  return b.n === 2 && b.enough === false && b.threePuttRate === null;
+})());
+chk('A15 a bucket at the minimum sample reports its rate', (() => {
+  // 10 holes inside 10 ft, 2 of them three-putted -> 0.2
+  const holes = Array.from({ length: 10 }, (_, i) => distHole(5, i < 2 ? 3 : 2, true));
+  const b = threePuttRates([mkDistRound(holes)]).find(x => x.key === 'under10');
+  return b.n === 10 && b.enough === true && Math.abs(b.threePuttRate - 0.2) < 1e-9;
+})());
+chk('A15 one-putt rate is reported alongside', (() => {
+  const holes = Array.from({ length: 10 }, (_, i) => distHole(5, i < 4 ? 1 : 2, true));
+  const b = threePuttRates([mkDistRound(holes)]).find(x => x.key === 'under10');
+  return Math.abs(b.onePuttRate - 0.4) < 1e-9;
+})());
+chk('A15 holes with no recorded distance are excluded entirely', (() => {
+  const holes = [distHole(null, 3, true), distHole(null, 3, true)];
+  return threePuttRates([mkDistRound(holes)]).every(b => b.n === 0);
+})());
+chk('A15 all three buckets are always returned, even when empty', (() => {
+  const r = threePuttRates([]);
+  return r.length === 3 && r.every(b => b.n === 0 && b.enough === false);
+})());
+
+chk('A15 chipProximity measures only holes where the green was missed', (() => {
+  const holes = [distHole(30, 2, false), distHole(8, 2, true), distHole(40, 3, false)];
+  const c = chipProximity([mkDistRound(holes)]);
+  return c.n === 2 && Math.abs(c.median - 35) < 0.01;
+})());
+chk('A15 chipProximity reports the share landing in each bucket', (() => {
+  const holes = [distHole(30, 2, false), distHole(40, 3, false), distHole(5, 1, false), distHole(12, 2, false)];
+  const c = chipProximity([mkDistRound(holes)]);
+  const over25 = c.buckets.find(b => b.key === 'over25');
+  return c.n === 4 && over25.count === 2 && Math.abs(over25.share - 0.5) < 1e-9;
+})());
+chk('A15 chipProximity with no distance data reports n=0 and null median', (() => {
+  const c = chipProximity([mkDistRound([distHole(null, 2, false)])]);
+  return c.n === 0 && c.median === null && c.buckets === null;
+})());
+chk('A15 the whole distance tier is silent on the existing data, not wrong', (() => {
+  // pineRound has firstPuttFt nowhere; nothing should claim a rate.
+  return threePuttRates(pineRound).every(b => b.n === 0 && b.threePuttRate === null)
+    && chipProximity(pineRound).n === 0;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

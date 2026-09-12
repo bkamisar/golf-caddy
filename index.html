@@ -422,6 +422,82 @@ function overParByParType(rounds) {
   };
 }
 
+// Three buckets, not five: with roughly 15 recorded first putts per round, more
+// buckets would mean each one waits far longer to reach a usable sample. The
+// boundaries are chosen to be diagnostic rather than even — inside 10 feet a
+// three-putt is a real putting fault, beyond 25 it is mostly lag speed.
+var PUTT_BUCKETS = [
+  { key: 'under10', label: 'inside 10 ft', min: 0,  max: 10 },
+  { key: '10to25',  label: '10-25 ft',     min: 10, max: 25 },
+  { key: 'over25',  label: 'beyond 25 ft', min: 25, max: Infinity },
+];
+var PUTT_BUCKET_MIN_N = 10;
+
+function puttBucket(ft) {
+  if (ft == null || typeof ft !== 'number' || isNaN(ft)) return null;
+  for (let i = 0; i < PUTT_BUCKETS.length; i++) {
+    const b = PUTT_BUCKETS[i];
+    if (ft >= b.min && ft < b.max) return b.key;
+  }
+  return null;
+}
+
+// 3-putt rate by distance. Anchored to two-putt regulation — a definition of
+// the game, not a reference to any population of golfers — so no baseline curve
+// is needed and none can be wrong. A rate below PUTT_BUCKET_MIN_N holes is
+// withheld rather than shown noisy, matching computeGapping's lowConfidence
+// gate on the range side.
+function threePuttRates(rounds) {
+  const acc = {};
+  PUTT_BUCKETS.forEach(b => { acc[b.key] = { n: 0, three: 0, one: 0 }; });
+  roundsWithDetail(rounds).forEach(r => {
+    r.holeDetail.forEach(h => {
+      if (!h || h.putts == null) return;
+      const k = puttBucket(h.firstPuttFt);
+      if (!k) return;
+      acc[k].n++;
+      if (h.putts >= 3) acc[k].three++;
+      if (h.putts === 1) acc[k].one++;
+    });
+  });
+  return PUTT_BUCKETS.map(b => {
+    const a = acc[b.key];
+    const enough = a.n >= PUTT_BUCKET_MIN_N;
+    return {
+      key: b.key, label: b.label, n: a.n, enough,
+      threePuttRate: enough ? a.three / a.n : null,
+      onePuttRate: enough ? a.one / a.n : null,
+    };
+  });
+}
+
+// Chipping quality: where the first putt is left after a green miss. This is a
+// description, not a comparison — "chips finish beyond 25 ft half the time" is
+// actionable without any external reference, which is the whole reason it
+// replaced an expected-putts curve.
+function chipProximity(rounds) {
+  const dists = [];
+  roundsWithDetail(rounds).forEach(r => {
+    r.holeDetail.forEach(h => {
+      if (!h || h.gir) return;
+      if (puttBucket(h.firstPuttFt) === null) return;
+      dists.push(h.firstPuttFt);
+    });
+  });
+  if (!dists.length) return { n: 0, median: null, buckets: null };
+  const counts = {};
+  PUTT_BUCKETS.forEach(b => { counts[b.key] = 0; });
+  dists.forEach(d => { counts[puttBucket(d)]++; });
+  return {
+    n: dists.length,
+    median: median(dists),
+    buckets: PUTT_BUCKETS.map(b => ({
+      key: b.key, label: b.label,
+      count: counts[b.key], share: counts[b.key] / dists.length,
+    })),
+  };
+}
+
 function computeMetrics(rounds) {
   // NEVER trust caller order (a newest-first paste fed directly would silently
   // reverse every "recent vs baseline" comparison — caught in the 2026-07 stress test).
