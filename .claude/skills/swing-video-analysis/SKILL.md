@@ -84,10 +84,49 @@ follow-through instead of the actual strike — the club and arms keep
 moving fast well past the ball, and that continued motion can dominate the
 signal more than the impact instant itself.
 
-With impact located (by whichever method), read the rest off the same
-motion-energy series around it: address is the last quiet frame before the
-energy rises, top of the backswing is the local dip between the rise and
-the impact spike, finish is where energy settles back down.
+With impact located (by whichever method), read the rest off a motion-energy
+series around it: address is the last quiet frame before the energy rises,
+top of the backswing is the local dip between the rise and the impact spike
+(the club momentarily stops and reverses), finish is where energy settles.
+
+**Use a CROPPED energy scan for this, not `SH.scanMotion`'s whole-frame
+one.** `scanMotion` averages over the entire frame, and a golfer typically
+occupies well under 10% of a wide clip — which is why its peak can land on
+follow-through rather than impact. Re-running the same frame-difference
+restricted to a box around the player sharpens it decisively. Build the
+crop box from a landmark you've already clicked (or eyeball it from one
+screenshot), then run the difference over just that region:
+
+```js
+const CROP = { x: 290, y: 250, w: 230, h: 340 };  // box around the player
+const small = document.createElement('canvas');
+small.width = 115; small.height = 170;            // half-scale is plenty
+const sx = small.getContext('2d', { willReadFrequently: true });
+const out = []; let prev = null;
+for (let t = t0; t <= t1; t += 0.0333) {          // ~one frame at 30fps
+  await SH.seek(t);
+  sx.drawImage(v, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, small.width, small.height);
+  const cur = sx.getImageData(0, 0, small.width, small.height).data;
+  if (prev) { let s = 0; for (let i = 0; i < cur.length; i += 4) s += Math.abs(cur[i] - prev[i]);
+    out.push({ t: +t.toFixed(3), e: +(s / (cur.length/4)).toFixed(2) }); }
+  prev = cur.slice();
+}
+```
+
+Two things to expect from this series. **Occasional exact `0` values are a
+sampling artifact**, not stillness — a 0.0333s step against a 30fps video
+drifts enough to sample the same underlying frame twice, and the reading
+immediately before a `0` is correspondingly inflated by a double-frame
+jump. Ignore both rather than reading them as signal. And **the top of the
+backswing shows up as the series minimum**, which is usually easier to
+identify reliably than picking it out of a filmstrip by eye — the arms are
+genuinely near-stationary for several frames there, so eyeballing it is
+imprecise in a way this measurement is not.
+
+A filmstrip is still the right tool for identifying *which* position a
+frame shows (address vs. top vs. finish). Draw several cropped frames onto
+one canvas with timestamps burned in, and screenshot that once, rather than
+screenshotting each candidate timestamp separately.
 
 **Visually confirm every position before using it** — `SH.seek(t)` then a
 screenshot. These are heuristics, not certainties.
@@ -189,8 +228,25 @@ as if it were a checked-and-empty measurement.
 Every finding you actually write gets exactly one of these — they are
 mutually exclusive, not a spectrum:
 
-- **`measured`** — `correctedDelta(...)` was computed and returned
-  `signal: true`.
+- **`measured`** — a quantitative result that clears its own stated
+  uncertainty. Two distinct paths qualify, and the tier is about the
+  evidence's quality, not which function produced it:
+  - **Landmark delta** — `correctedDelta(...)` returned `signal: true`
+    (case 4 in step 6).
+  - **Timing** — `tempoRatio(...)` computed from frame timestamps you
+    visually confirmed, where the sampling granularity is small relative to
+    the durations being divided. Record the plausible range alongside the
+    ratio (re-run `tempoRatio` at the edges of your timestamp uncertainty),
+    since a ratio from two short durations is more sensitive to a
+    one-frame error than the raw numbers suggest.
+
+  A quantitative attempt whose numbers do NOT separate from their own noise
+  floor is not `measured` — it's either `visual` (if you still have an
+  honest eyeballed observation) or nothing at all. Frame-difference energy
+  in particular is often NOT usable as evidence outdoors: wind-blown
+  vegetation and camera shake can sit at the same level as the body motion
+  being measured. Check that separation before relying on it, and say so
+  plainly when it fails.
 - **`visual`** — either there's no clean landmark-pair delta for this kind
   of observation at all (grip, finish balance — these are read directly off
   a frame, not from a computed delta), or `correctedDelta(...)`'s result
@@ -244,11 +300,17 @@ Schema (see `FINDING_TAXONOMY`, `gradeFinding`, `mergeFindings` in
 ```
 
 There's no structured numeric field, only `measurement` as free text — but
-`isImprovement` needs the PRIOR entry's magnitude to compare against. Always
-lead `measurement` with `magnitude: <px>px, noiseFloor: <px>px` in exactly
-that form (only for `measured`-confidence findings, where these numbers
-exist) so a future session can parse the prior value back out rather than
-having nothing to compare against.
+`isImprovement` needs the PRIOR entry's number to compare against, so
+`measured` findings must lead this field with a parseable value in exactly
+one of these two forms, matching which measurement path produced it:
+
+- Landmark delta: `magnitude: <px>px, noiseFloor: <px>px, ...`
+- Timing: `ratio: <n>:1 (backswing <s>s / downswing <s>s), range <lo>-<hi>, ...`
+
+Then append the N-of-M consistency. For a `visual` finding there are no
+such numbers — describe what was seen instead, and say explicitly if a
+quantitative attempt was made and failed, so a later session doesn't
+repeat it blind.
 
 - **The taxonomy is fixed.** Use only keys already in `FINDING_TAXONOMY`
   (`early-extension`, `swing-plane`, `low-point-control`,

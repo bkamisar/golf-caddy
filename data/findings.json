@@ -1,1 +1,28 @@
-[]
+[
+  {
+    "id": "tempo-sequencing-driver-other",
+    "finding": "tempo-sequencing",
+    "clubs": ["Driver"],
+    "assessment": "neutral",
+    "confidence": "measured",
+    "measurement": "ratio: 1.57:1 (backswing 0.450s / downswing 0.287s), range 1.35-1.83, observed in 1 of 1 swings",
+    "cameraAngle": "other",
+    "firstNoted": "2026-09-13",
+    "lastConfirmed": "2026-09-13",
+    "status": "open",
+    "note": "Baseline only -- first video on record, so there is nothing to compare this against and no claim is made about whether 1.57:1 is good. Recorded so a later video can be checked against it. Timestamps: takeaway starts between 0.667s and 0.700s (club still at the ball at 0.667, clearly moving by 0.700); top at 1.133s, taken from the minimum of a player-cropped frame-difference series rather than by eye, since the arms are near-stationary for several frames there; impact at 1.420s from the audio transient (99x prominence), independently corroborated by the cropped-motion peak at 1.399-1.433s. The range reflects one-frame uncertainty at each end -- a ratio built from two sub-half-second durations is more sensitive to that than the raw numbers look."
+  },
+  {
+    "id": "finish-balance-driver-other",
+    "finding": "finish-balance",
+    "clubs": ["Driver"],
+    "assessment": "strength",
+    "confidence": "visual",
+    "measurement": "holds the finish from ~1.8s to the clip's end at 2.97s (~1.1s) with no step, stumble, or recovery adjustment; observed in 1 of 1 swings",
+    "cameraAngle": "other",
+    "firstNoted": "2026-09-13",
+    "lastConfirmed": "2026-09-13",
+    "status": "open",
+    "note": "Eyeballed from a filmstrip, NOT quantified -- an attempt to back it with a player-cropped frame-difference series failed and should not be repeated blind on outdoor footage like this. The settled-finish median (1.42) sat inside the range of the backswing's own values (1.5-2.3) with excursions to 2.70, because wind-blown reeds behind the player and handheld camera shake put the noise floor at the same level as the body motion being measured. The visual observation stands on its own; there is no number behind it."
+  }
+]
