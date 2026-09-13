@@ -254,11 +254,22 @@ var SH = {
   // decodable audio or no audibly sharp strike, so the caller falls back.
   findImpactAudio: async function (t0, t1) {
     var audio;
-    try {
-      var buf = await (await fetch(clipUrl)).arrayBuffer();
-      var actx = new (window.AudioContext || window.webkitAudioContext)();
-      audio = await actx.decodeAudioData(buf);
-    } catch (e) { return null; }
+    // Retried a few times: a plain fetch of a large clip through this
+    // browser-automation environment has been observed to intermittently
+    // fail ("Failed to fetch" / connection reset) even after a real server
+    // bug in the same path was fixed -- possibly the sandboxed
+    // browser-to-localhost relay itself, not just the server. Without a
+    // retry, that transient failure and a genuinely undecodable/silent clip
+    // both fall into the same catch and return the same null, silently
+    // conflating "no transient" with "the network hiccuped" -- exactly the
+    // kind of noise-as-conclusion this project avoids everywhere else.
+    for (var attempt = 0; attempt < 3 && !audio; attempt++) {
+      try {
+        var buf = await (await fetch(clipUrl)).arrayBuffer();
+        var actx = new (window.AudioContext || window.webkitAudioContext)();
+        audio = await actx.decodeAudioData(buf);
+      } catch (e) { if (attempt === 2) return null; }
+    }
     var data = audio.getChannelData(0), rate = audio.sampleRate;
     var a = Math.max(0, Math.floor(t0 * rate));
     var b = Math.min(data.length, Math.ceil(t1 * rate));
