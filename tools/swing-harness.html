@@ -317,11 +317,17 @@ var SH = {
   // silent error in the measurement.
   mark: function (label) { pendingLabel = label; return 'armed: ' + label; },
   points: function () { return marks.slice(); },
-  clearPoints: function () { marks = []; render(); return 'cleared'; },
+  clearPoints: function () { marks = []; pendingLabel = null; render(); return 'cleared'; },
 
   // Draws the measurement between two named marks so the delta is visible in the
-  // screenshot rather than asserted in prose.
+  // screenshot rather than asserted in prose. Note this line is not persisted:
+  // any later seek/setView/click/clearPoints call re-renders from marks alone
+  // and silently erases it. Screenshot immediately after calling this, before
+  // doing anything else, or the annotation will already be gone.
   annotate: function (labelA, labelB, caption) {
+    // Re-marking a label overwrites the prior mark under it (see the click
+    // handler below), so at most one mark per label ever exists here -- this
+    // lookup does not need "most recent wins" logic of its own.
     var A = marks.filter(function (m) { return m.label === labelA; })[0];
     var B = marks.filter(function (m) { return m.label === labelB; })[0];
     if (!A || !B) return 'missing mark';
@@ -337,11 +343,28 @@ var SH = {
 };
 
 c.addEventListener('click', function (e) {
+  // A click with no label armed is refused, not silently recorded -- every
+  // other function in this file gates on ambiguity rather than guessing
+  // (correctedDelta's signal, toInches' missing-scale null, etc.), and an
+  // unlabeled click is exactly that: a mark nothing can safely reference.
+  if (pendingLabel == null) { log('click ignored: no label armed -- call SH.mark(label) first'); return; }
   var r = c.getBoundingClientRect();
   var scr = { x: (e.clientX - r.left) * (c.width / r.width),
               y: (e.clientY - r.top) * (c.height / r.height) };
   var p = screenToVideo(scr, view);
-  if (!p) return;
+  // Also refused if the click resolves outside the actual video frame -- the
+  // canvas can show letterboxed empty space when its aspect ratio doesn't
+  // match the loaded video's, and a click there is not a real position.
+  if (!p || p.x < 0 || p.y < 0 || p.x > v.videoWidth || p.y > v.videoHeight) {
+    log('click ignored: outside the video frame');
+    return;
+  }
+  // Re-marking the same label overwrites its prior point rather than adding
+  // a second one -- this is the intended way to correct a misclick (re-arm
+  // the same label and click again). Without this, annotate() and any other
+  // by-label lookup would keep resolving to whichever point was clicked
+  // FIRST, silently ignoring the correction.
+  marks = marks.filter(function (m) { return m.label !== pendingLabel; });
   marks.push({ x: p.x, y: p.y, label: pendingLabel, time: v.currentTime });
   log('marked ' + pendingLabel + ' at ' + p.x.toFixed(1) + ',' + p.y.toFixed(1));
   pendingLabel = null;
