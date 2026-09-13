@@ -126,8 +126,23 @@ var marks = [];
 var pendingLabel = null;
 var clipUrl = null;
 var pendingSeekReject = null;
+var pendingLoadReject = null;
 
 function log(msg) { logEl.textContent = String(msg); }
+
+// Single error handler for the <video> element, set once and never
+// reassigned per-call (an earlier version set v.onerror separately inside
+// load() and left it attached with no path back to a seek in flight — a
+// decode error during a later scrub would only reach log(), leaving
+// whichever seek() promise was pending to hang forever with no rejection).
+// Rejects whichever operation is actually outstanding, load or seek.
+function onVideoError() {
+  var msg = 'decode failed: ' + (v.error && v.error.message);
+  log(msg);
+  if (pendingLoadReject) { pendingLoadReject(new Error(msg)); pendingLoadReject = null; }
+  else if (pendingSeekReject) { pendingSeekReject(new Error(msg)); pendingSeekReject = null; }
+}
+v.onerror = onVideoError;
 
 // Callers must await one seek before issuing the next. Assigning v.onseeked
 // again before the previous seek fires overwrites the handler, which would
@@ -144,8 +159,13 @@ function log(msg) { logEl.textContent = String(msg); }
 // loaded, never-painted video hand back a solid-black frame at t=0 while
 // still reporting readyState 4. Every caller depends on the returned frame
 // actually being painted, so there is no safe case to skip this wait.
+//
+// Rejects immediately, rather than hanging, if called before a video has
+// loaded far enough to seek at all (readyState HAVE_NOTHING) -- otherwise
+// assigning currentTime here may never produce a `seeked` event.
 function seek(t) {
   if (pendingSeekReject) { pendingSeekReject(new Error('seek superseded by a newer seek')); pendingSeekReject = null; }
+  if (v.readyState < 1) return Promise.reject(new Error('seek() called before a video is loaded'));
   return new Promise(function (res, rej) {
     pendingSeekReject = rej;
     v.onseeked = function () {
@@ -176,18 +196,15 @@ var SH = {
     clipUrl = url;
     return new Promise(function (res, rej) {
       v.onloadedmetadata = function () {
+        // Clear this on success: onVideoError checks pendingLoadReject first,
+        // and a load that already resolved must not keep intercepting a
+        // later, unrelated mid-seek decode error.
+        pendingLoadReject = null;
         view = { cropX: 0, cropY: 0,
                  zoom: Math.min(c.width / v.videoWidth, c.height / v.videoHeight) };
         res({ duration: v.duration, width: v.videoWidth, height: v.videoHeight });
       };
-      // Stays attached after a successful load, so a later mid-scrub decode
-      // error (a bad region of the source file) still needs to surface
-      // somewhere rather than silently no-op on an already-settled promise.
-      v.onerror = function () {
-        var msg = 'decode failed: ' + (v.error && v.error.message);
-        log(msg);
-        rej(new Error(msg));
-      };
+      pendingLoadReject = rej;
       v.src = url;
     });
   },
@@ -200,6 +217,9 @@ var SH = {
 
   // Frame-to-frame pixel difference at low resolution. Returns numbers, never
   // images, which is what makes scanning a long multi-swing clip affordable.
+  // Samples the red channel only, as a fast luminance proxy rather than a
+  // full R+G+B/luma average -- a 3x speed shortcut, not yet shown to matter
+  // for detection quality one way or the other.
   scanMotion: async function (t0, t1, step) {
     var small = document.createElement('canvas');
     small.width = 96;
@@ -208,13 +228,20 @@ var SH = {
     var out = [], prev = null;
     for (var t = t0; t <= t1; t += step) {
       await seek(t);
+      // dWidth/dHeight here are exactly small.width/height, so drawImage
+      // always overwrites the entire canvas -- no clearRect needed, and no
+      // rounding case can leave a stale pixel from the previous frame.
       sctx.drawImage(v, 0, 0, small.width, small.height);
       var cur = sctx.getImageData(0, 0, small.width, small.height).data;
       if (prev) {
         var sum = 0;
         for (var i = 0; i < cur.length; i += 4) sum += Math.abs(cur[i] - prev[i]);
+        // Not rounded to an integer: this value feeds a peak-vs-median
+        // comparison where the signal is often only a small multiple of the
+        // noise floor, and integer rounding can quietly erase the exact
+        // distinction that comparison depends on.
         out.push({ time: Math.round(t * 1000) / 1000,
-                   energy: Math.round(sum / (cur.length / 4)) });
+                   energy: Math.round(sum / (cur.length / 4) * 100) / 100 });
       }
       prev = cur.slice();
     }
