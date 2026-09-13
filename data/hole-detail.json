@@ -260,5 +260,41 @@
       { "hole": 17, "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": null, "fir": true,  "driveMiss": null },
       { "hole": 18, "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,   "teeClub": null, "fir": true,  "driveMiss": null }
     ]
+  },
+  {
+    "date": "2026-09-12",
+    "course": "Paint Branch Golf",
+    "rating": 29.2,
+    "slope": 83,
+    "score": 43,
+    "putts": 22,
+    "girPct": 33,
+    "firPct": 75,
+    "penalties": 2,
+    "verified": {
+      "parSum": "31 out — matches card's OUT/TOTAL",
+      "scoreSum": "43 out — matches card and the round already recorded in data/rounds.json",
+      "puttsSum": "22 out — matches card and data/rounds.json",
+      "firCount": "3 of 4 non-par-3 fairways (holes 1, 5, 6 hit; 9 missed) = 75% — matches card's own FAIRWAY subtotal and data/rounds.json",
+      "girCount": "3 of 9 (holes 2, 7, 9) = 33% — matches card and data/rounds.json",
+      "penaltiesSum": "1 out-of-bounds event (hole 8) recorded by the card as 2 penalty strokes — matches card's OUT/TOTAL of 2"
+    },
+    "unresolved": [
+      "This capture is from Grint's in-app scorecard/edit view rather than the printed scorecard image used for prior rounds. Its DRIVING and GIR% rows are unambiguous per-hole icons (no hand-transcribed arrows), and the penalty code (O = Out of Bounds) is spelled out directly in the app's own legend, so this round's penalty total is understood cleanly for once: a single OB event on hole 8, counted as 2 strokes under stroke-and-distance -- not a case of the usual lie-code/stroke-count ambiguity.",
+      "Hole 3 and hole 5's DISTANCE (ft) cells were blank (not '0' or a dash) -- recorded as firstPuttFt:null rather than guessed.",
+      "Hole 1's DISTANCE (ft) cell reads '50+', not an exact number. Recorded as firstPuttFt:50 (a floor, not the true value), consistent with prior captures' handling of the same '50+' display cap.",
+      "Hole 9's tee shot missed the fairway severely (chevron icon) but the hole was still recorded as a GIR hit -- an unusual but internally consistent combination (a short par 4 or a recovery shot reaching the green), not a transcription conflict."
+    ],
+    "holes": [
+      { "hole": 1, "par": 4, "score": 6, "putts": 3, "firstPuttFt": 50,   "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 2, "par": 3, "score": 4, "putts": 3, "firstPuttFt": 40,   "gir": true,  "girMiss": null,   "teeClub": "PW", "fir": null,  "driveMiss": null },
+      { "hole": 3, "par": 3, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 4, "par": 3, "score": 4, "putts": 2, "firstPuttFt": 40,   "gir": false, "girMiss": "miss", "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 5, "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 6, "par": 4, "score": 5, "putts": 2, "firstPuttFt": 30,   "gir": false, "girMiss": "miss", "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 7, "par": 3, "score": 3, "putts": 2, "firstPuttFt": 20,   "gir": true,  "girMiss": null,   "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 8, "par": 3, "score": 5, "putts": 2, "firstPuttFt": 20,   "gir": false, "girMiss": "severe","teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 9, "par": 4, "score": 5, "putts": 3, "firstPuttFt": 30,   "gir": true,  "girMiss": null,   "teeClub": "Dr", "fir": false, "driveMiss": "severe" }
+    ]
   }
 ]
