@@ -120,16 +120,32 @@ var c = document.getElementById('c');
 var ctx = c.getContext('2d', { willReadFrequently: true });
 var logEl = document.getElementById('log');
 var view = { cropX: 0, cropY: 0, zoom: 1 };
+// marks[i].x/y are stored in video-native pixel space (screenToVideo's output),
+// not canvas/screen space -- render() below converts back for drawing.
 var marks = [];
 var pendingLabel = null;
 var clipUrl = null;
+var pendingSeekReject = null;
 
 function log(msg) { logEl.textContent = String(msg); }
 
+// Callers must await one seek before issuing the next. Assigning v.onseeked
+// again before the previous seek fires overwrites the handler, which would
+// otherwise orphan the earlier call's promise forever (the browser only fires
+// one `seeked` event for the latest pending target). Guard against that by
+// explicitly rejecting whichever seek is still outstanding when a new one
+// starts, so a caller that violates the contract gets a catchable error
+// instead of a silent hang.
 function seek(t) {
-  return new Promise(function (res) {
+  if (pendingSeekReject) { pendingSeekReject(new Error('seek superseded by a newer seek')); pendingSeekReject = null; }
+  return new Promise(function (res, rej) {
     if (Math.abs(v.currentTime - t) < 1e-4) return res(v.currentTime);
-    v.onseeked = function () { v.onseeked = null; res(v.currentTime); };
+    pendingSeekReject = rej;
+    v.onseeked = function () {
+      v.onseeked = null;
+      pendingSeekReject = null;
+      res(v.currentTime);
+    };
     v.currentTime = t;
   });
 }
@@ -157,7 +173,14 @@ var SH = {
                  zoom: Math.min(c.width / v.videoWidth, c.height / v.videoHeight) };
         res({ duration: v.duration, width: v.videoWidth, height: v.videoHeight });
       };
-      v.onerror = function () { rej(new Error('decode failed: ' + (v.error && v.error.message))); };
+      // Stays attached after a successful load, so a later mid-scrub decode
+      // error (a bad region of the source file) still needs to surface
+      // somewhere rather than silently no-op on an already-settled promise.
+      v.onerror = function () {
+        var msg = 'decode failed: ' + (v.error && v.error.message);
+        log(msg);
+        rej(new Error(msg));
+      };
       v.src = url;
     });
   },
