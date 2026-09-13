@@ -73,6 +73,9 @@ if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8940
     # Threading, not plain TCPServer: one stalled connection must not block
     # every other request, and daemon_threads lets the process exit cleanly.
+    # Loopback only, never '' (all interfaces) -- this repo's contents,
+    # including any locally-copied swing video, must never be reachable from
+    # anything else on the network.
     server = http.server.ThreadingHTTPServer(('127.0.0.1', port), RangeHTTPRequestHandler)
     server.daemon_threads = True
     server.serve_forever()
