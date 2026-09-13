@@ -189,7 +189,30 @@ var SH = {
     view = { cropX: cropX, cropY: cropY, zoom: zoom }; render(); return view;
   },
   getView: function () { return view; },
-  time: function () { return v.currentTime; }
+  time: function () { return v.currentTime; },
+
+  // Frame-to-frame pixel difference at low resolution. Returns numbers, never
+  // images, which is what makes scanning a long multi-swing clip affordable.
+  scanMotion: async function (t0, t1, step) {
+    var small = document.createElement('canvas');
+    small.width = 96;
+    small.height = Math.max(1, Math.round(96 * v.videoHeight / v.videoWidth));
+    var sctx = small.getContext('2d', { willReadFrequently: true });
+    var out = [], prev = null;
+    for (var t = t0; t <= t1; t += step) {
+      await seek(t);
+      sctx.drawImage(v, 0, 0, small.width, small.height);
+      var cur = sctx.getImageData(0, 0, small.width, small.height).data;
+      if (prev) {
+        var sum = 0;
+        for (var i = 0; i < cur.length; i += 4) sum += Math.abs(cur[i] - prev[i]);
+        out.push({ time: Math.round(t * 1000) / 1000,
+                   energy: Math.round(sum / (cur.length / 4)) });
+      }
+      prev = cur.slice();
+    }
+    return out;
+  }
 };
 </script>
 </body>
