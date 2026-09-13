@@ -345,14 +345,14 @@ makes the method reproducible instead of re-derived each session.
 5. Emit findings as JSON matching `data/findings.json`, with confidence and
    camera angle set honestly.
 
-**Prerequisites:** ffmpeg is not currently installed on this machine. Python
-3.14.3 is available for the contact-sheet step. MediaPipe Pose would be more
-rigorous than ad hoc color-region cropping, but wheel availability for Python
-3.14 must be verified before depending on it — this is a possible later
-refinement, not a v1 requirement.
-
-**Steps 1–3 should be a checked-in script**, not prose instructions, so frame
-extraction is deterministic run to run.
+**Superseded 2026-09-12** by
+`2026-09-12-swing-video-analysis-design.md`. The method above assumed ffmpeg
+for frame extraction; ffmpeg is not installed and is not needed. A Chromium
+browser decodes the clip natively and canvas pixel access makes the measurement
+numerically, which satisfies principle 4 above more directly than extracted
+frames would. The frame-extraction steps are replaced by a checked-in harness
+page; the honesty rules (principle 4, camera-angle gating, confidence levels)
+carry over unchanged.
 
 ## Out of scope
 
