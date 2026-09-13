@@ -88,6 +88,31 @@ function correctedDelta(landmarkA, landmarkB, refsA, refsB) {
     signal: refsA.length >= 2 && magnitude > noiseFloor
   };
 }
+
+// Backswing duration over downswing duration. Reports the measured ratio and
+// nothing about whether it is good — this project carries no population
+// baseline by design.
+function tempoRatio(addressTime, topTime, impactTime) {
+  if (addressTime == null || topTime == null || impactTime == null) return null;
+  var back = topTime - addressTime;
+  var down = impactTime - topTime;
+  if (!(back > 0) || !(down > 0)) return null;
+  return back / down;
+}
+
+// A finding is only improving when it shrank by more than the noise floor of the
+// current measurement. A smaller number inside the noise is not progress.
+function isImprovement(prevMagnitude, currMagnitude, noiseFloor) {
+  if (prevMagnitude == null || currMagnitude == null || noiseFloor == null) return false;
+  return currMagnitude < prevMagnitude - noiseFloor;
+}
+
+// Pixels to inches, only when a credible in-frame reference was actually
+// measured. Returns null rather than inventing a scale.
+function toInches(pixels, scaleRef) {
+  if (pixels == null || !scaleRef || !scaleRef.pixels || scaleRef.inches == null) return null;
+  return pixels * (scaleRef.inches / scaleRef.pixels);
+}
 /*MEASURE-END*/
 </script>
 </body>

@@ -99,4 +99,22 @@ chk('M4 magnitude exactly at the noise floor is still no signal (not >=)',
       [{ x: 0, y: 0 }, { x: 50, y: 50 }]);
     return r.magnitude === r.noiseFloor && r.signal === false; })());
 
+// M5. tempoRatio — backswing over downswing, straight from the frame times.
+chk('M5 0.9s back over 0.3s down is 3.0', near(tempoRatio(1.0, 1.9, 2.2), 3));
+chk('M5 zero-length downswing returns null', tempoRatio(1.0, 1.9, 1.9) === null);
+chk('M5 out-of-order times return null', tempoRatio(2.0, 1.0, 3.0) === null);
+chk('M5 missing time returns null', tempoRatio(null, 1.9, 2.2) === null);
+
+// M6. isImprovement — shrinking inside the noise is not progress.
+chk('M6 shrank by more than the noise floor', isImprovement(30, 10, 5) === true);
+chk('M6 shrank by less than the noise floor', isImprovement(30, 27, 5) === false);
+chk('M6 grew', isImprovement(10, 30, 5) === false);
+chk('M6 missing previous measurement is not improvement', isImprovement(null, 10, 5) === false);
+
+// M7. toInches — never guess a scale.
+chk('M7 converts with a credible reference',
+  near(toInches(50, { pixels: 100, inches: 12 }), 6));
+chk('M7 no reference returns null', toInches(50, null) === null);
+chk('M7 zero-pixel reference returns null', toInches(50, { pixels: 0, inches: 12 }) === null);
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
