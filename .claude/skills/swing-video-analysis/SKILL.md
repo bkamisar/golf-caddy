@@ -104,40 +104,96 @@ re-confirm things already established.
 
 ## 6. Measure
 
-Per finding candidate, between two chosen frames A and B:
+Before measuring a candidate, check the confirmed camera angle against
+`FINDING_TAXONOMY`'s `angles` list for it (step 3). **If the angle can't
+support it, don't spend a measurement pass on it at all** —
+`gradeFinding()` in `range.html` will force it to `speculative` regardless
+of what's measured, so the harness/screenshot budget is better spent on
+candidates the angle can actually support.
 
-1. `SH.seek(timeA)`, `SH.setView(cropX, cropY, zoom)` to zoom in on the
-   relevant body part for precision.
-2. `SH.mark('<landmark>')`, click the landmark, screenshot to confirm the
-   crosshair actually landed on it. This is the one visual judgment call
-   in the whole pipeline — everything after this point is arithmetic. If
-   the crosshair is off, `SH.mark('<landmark>')` the same label again and
-   re-click; the harness replaces the prior point rather than keeping both.
-3. Repeat step 1–2 for frame B, same landmark label change (e.g.
-   `'<landmark>_b'` or reuse a session-scoped naming scheme — `SH.points()`
-   returns everything currently marked if you need to check).
-4. Mark **two or more static background references** (a tree, a fence post
-   — anything that did not move) in both frames. Fewer than two references
-   means `correctedDelta` can never report `signal: true`, by design.
-5. Read back `SH.points()` and compute `correctedDelta(landmarkA, landmarkB, refsA, refsB)` (from the harness's MEASURE block — call it directly in
-   the page via `javascript_tool`, passing the actual point objects).
-6. **If `signal` is false, report no signal.** Not a weak finding — nothing.
-   This applies whether the cause is genuinely-small movement, too few
-   references, or the movement being smaller than the frames' own noise
-   floor (camera shake). Don't soften this into "a slight change was
-   observed."
+`SH.points()` returns one flat, unscoped list of every mark currently set —
+labels are the only thing distinguishing them, marks are never
+frame-scoped, and `correctedDelta`'s reference arrays are matched **by
+array position, not by label** (`refsA[i]` and `refsB[i]` must be the same
+physical point). Getting either of those wrong produces a wrong number with
+no error. Use this exact worked pattern per candidate, with concrete
+labels — not placeholders:
+
+```js
+// 1. Clear anything left over from a prior candidate. Marks persist across
+//    seeks and are drawn on top of whatever frame is currently loaded, so a
+//    leftover label from a previous measurement can silently collide.
+SH.clearPoints();
+
+// 2. Frame A (e.g. address). Mark the landmark, then 2+ static references,
+//    in this order, and use the SAME reference labels at frame B.
+await SH.seek(addressTime); SH.setView(cropX, cropY, zoom);
+SH.mark('hip_a');    // click the hip
+SH.mark('ref1_a');   // click a static point, e.g. a fence post
+SH.mark('ref2_a');   // click a second static point, e.g. a tree trunk
+
+// 3. Frame B (e.g. impact). Same landmark, same two physical reference
+//    points, re-clicked at their new (or unchanged) screen position.
+await SH.seek(impactTime); SH.setView(cropX, cropY, zoom);
+SH.mark('hip_b');
+SH.mark('ref1_b');   // the SAME fence post as ref1_a
+SH.mark('ref2_b');   // the SAME tree trunk as ref2_a
+
+// 4. Assemble the four arguments correctedDelta actually needs. refsA/refsB
+//    must list the same physical points in the same order (ref1 then ref2
+//    in both) -- cameraDrift pairs them by index, not by label.
+const pts = SH.points();
+const byLabel = (l) => pts.find(p => p.label === l);
+correctedDelta(
+  byLabel('hip_a'), byLabel('hip_b'),
+  [byLabel('ref1_a'), byLabel('ref2_a')],
+  [byLabel('ref1_b'), byLabel('ref2_b')]
+);
+```
+
+Take a screenshot after each `SH.mark()` + click to confirm the crosshair
+landed on the intended point before moving on — this is the one visual
+judgment call in the whole pipeline; everything after it is arithmetic. If
+a crosshair is off, `SH.mark()` the same label again and re-click — the
+harness replaces the prior point under that label rather than keeping both.
+
+**Reading the result:**
+
+- **`signal: true`** — this is a `measured` finding (step 7). Proceed to
+  write it.
+- **`signal: false`** (returned as a real object, not `null` — this happens
+  whenever `refCount` is 2+ but the corrected movement doesn't clearly
+  exceed the noise floor) — **report no signal for this candidate and write
+  nothing from this measurement.** Not a weak finding — nothing. This is
+  the ONLY outcome for this case; don't reclassify a `signal: false` result
+  as `speculative` or any other confidence tier.
+- **`null`** — fewer than two static references were available (0 or 1), so
+  no correction could be attempted at all. This isn't a "no signal" result,
+  it's "no measurement was possible" — see the `visual` tier in step 7.
 
 ## 7. Confidence
 
-Map the result onto the existing taxonomy enum:
+Every finding you actually write gets exactly one of these — they are
+mutually exclusive, not a spectrum:
 
-- **`measured`** — `correctedDelta().signal` was `true`.
-- **`visual`** — no clean landmark pair exists for this observation (grip,
-  finish balance), or fewer than two static references were available in
-  frame, so no correction could be attempted at all.
-- **`speculative`** — the confirmed camera angle can't support this
-  finding (per `FINDING_TAXONOMY`'s `angles`), or the measurement came back
-  with `signal: false`.
+- **`measured`** — `correctedDelta(...)` was computed and returned
+  `signal: true`.
+- **`visual`** — either there's no clean landmark-pair delta for this kind
+  of observation at all (grip, finish balance — these are read directly off
+  a frame, not from a computed delta), or `correctedDelta(...)` returned
+  `null` (fewer than two static references were available). Either way,
+  this is an honest, eyeballed observation, not a computed one — say so in
+  the `note` field.
+- **`speculative`** — the confirmed camera angle can't support this finding
+  per `FINDING_TAXONOMY`'s `angles`. `gradeFinding()` in `range.html`
+  applies this automatically regardless of what confidence is set, so this
+  is a safety net, not something to compute by hand — but per step 6, you
+  shouldn't be measuring angle-unsupported candidates in the first place.
+
+A `signal: false` result never becomes a finding under any confidence
+tier — see step 6. If you're tempted to write one anyway because the
+number "looked close," that's exactly the instinct this gate exists to
+override.
 
 ## 8. Spot-check consistency across other swings (if multi-swing)
 
@@ -150,21 +206,33 @@ distinction gets captured.
 
 ## 9. Write findings to `data/findings.json`
 
+There is no write UI for this (unlike recommendations, which have a form in
+`range.html`) — **edit `data/findings.json` directly** with your file tools,
+following the schema below, then commit it (step 13 covers the pre-commit
+media check).
+
 Schema (see `FINDING_TAXONOMY`, `gradeFinding`, `mergeFindings` in
 `range.html` for the authoritative definitions):
 
 ```json
-{ "id": "<unique>",
+{ "id": "<finding>-<clubs joined by '-'>-<cameraAngle>",
   "finding": "<taxonomy key>",
   "clubs": ["<club from step 3>"],
   "assessment": "fault" | "strength" | "neutral",
   "confidence": "measured" | "visual" | "speculative",
-  "measurement": "<free text: the numbers, and N-of-M consistency>",
+  "measurement": "magnitude: <px>px, noiseFloor: <px>px, observed in <N> of <M> swings",
   "cameraAngle": "down-the-line" | "front-on" | "other",
   "firstNoted": "<date>", "lastConfirmed": "<date>",
   "status": "open" | "improving" | "resolved",
   "note": "<free text>" }
 ```
+
+There's no structured numeric field, only `measurement` as free text — but
+`isImprovement` needs the PRIOR entry's magnitude to compare against. Always
+lead `measurement` with `magnitude: <px>px, noiseFloor: <px>px` in exactly
+that form (only for `measured`-confidence findings, where these numbers
+exist) so a future session can parse the prior value back out rather than
+having nothing to compare against.
 
 - **The taxonomy is fixed.** Use only keys already in `FINDING_TAXONOMY`
   (`early-extension`, `swing-plane`, `low-point-control`,
@@ -172,12 +240,22 @@ Schema (see `FINDING_TAXONOMY`, `gradeFinding`, `mergeFindings` in
   `backswing-width-turn`, `finish-balance`, `grip-setup`,
   `tempo-sequencing`). Never invent a new key here — extending the taxonomy
   is a code change in `range.html`, not something this skill does.
-- A genuinely new finding gets `firstNoted`/`lastConfirmed` set to today and
-  `status: "open"`.
-- A recurring finding updates `lastConfirmed`. Move it to `"improving"`
-  only when `isImprovement(prevMagnitude, currMagnitude, noiseFloor)`
-  (from the MEASURE block) actually returns `true` — not just because the
-  new number looks smaller by eye.
+- **`id` must be deterministic, not freshly minted each session** — build it
+  as `<finding>-<clubs joined by '-'>-<cameraAngle>` (e.g.
+  `early-extension-driver-down-the-line`). `mergeFindings` recognizes "the
+  same finding as last time" purely by matching `id`; a random or
+  session-specific id means every future session's finding looks brand new
+  forever, and `lastConfirmed`/`"improving"` can never actually fire. Before
+  writing, read the CURRENT `data/findings.json` and check whether this
+  exact id already exists — if so, this is the recurring case below, not a
+  new one.
+- A genuinely new finding (id not already present) gets `firstNoted`/
+  `lastConfirmed` set to today and `status: "open"`.
+- A recurring finding (id already present) updates `lastConfirmed`. Move it
+  to `"improving"` only when `isImprovement(prevMagnitude, currMagnitude,
+  noiseFloor)` (from the MEASURE block) actually returns `true` against the
+  PRIOR entry's recorded magnitude — not just because the new number looks
+  smaller by eye.
 - **Absence in one video never resolves a finding.** A finding only moves
   to `"resolved"` when the user or a later session explicitly decides that,
   never automatically from one clean-looking clip.
@@ -191,11 +269,27 @@ Schema (see `FINDING_TAXONOMY`, `gradeFinding`, `mergeFindings` in
 
 ## 10. Deliver
 
-`SH.setView(cropX, cropY, zoom)` to crop in on the player so the relevant
-detail is legible, `SH.annotate(labelA, labelB, caption)` to draw the
-measured line, then **screenshot immediately** — the annotation is not
-persisted and disappears on the next `seek`/`setView`/click/`clearPoints`
-call. Put that screenshot directly in the conversation.
+`render()` draws every current mark on top of whichever single frame is
+currently loaded — it has no idea a mark was placed at a different
+timestamp. `annotate(labelA, labelB, caption)` between two marks from
+DIFFERENT frames (e.g. address vs. impact) will draw a line whose endpoints
+don't both correspond to anything visible in whichever frame happens to be
+on screen. Deliver each frame's own mark on its own frame instead of trying
+to show the whole delta as one overlay:
+
+1. `SH.seek(timeA)`, `SH.setView(cropX, cropY, zoom)` cropped on the
+   relevant body part, screenshot — shows frame A's crosshair in place.
+2. `SH.seek(timeB)`, `SH.setView(...)`, screenshot — shows frame B's
+   crosshair in place.
+3. `annotate()` is for a caption/line WITHIN one already-displayed frame
+   (e.g. two reference points on the same frame, or a distance you want
+   drawn for that frame specifically) — use it there, immediately followed
+   by a screenshot, since the annotation disappears on the next
+   `seek`/`setView`/click/`clearPoints` call.
+
+State the measured numbers (magnitude, noise floor) in the conversation
+text alongside the two screenshots — the pictures show *where*, the text
+carries the actual delta.
 
 Conclusions (the findings text, the measurement, the confidence) reach the
 phone as data through `data/findings.json` → `range.html`. Pictures stay in
