@@ -254,6 +254,12 @@ var SH = {
   // decodable audio or no audibly sharp strike, so the caller falls back.
   findImpactAudio: async function (t0, t1) {
     var audio;
+    // One AudioContext reused across attempts and explicitly closed once the
+    // channel data is extracted below -- browsers cap the number of
+    // concurrently open AudioContexts, and creating a fresh one per retry
+    // attempt (an earlier version of this code did) risks exhausting that
+    // cap over a long harness session that calls this repeatedly.
+    var actx = new (window.AudioContext || window.webkitAudioContext)();
     // Retried a few times: a plain fetch of a large clip through this
     // browser-automation environment has been observed to intermittently
     // fail ("Failed to fetch" / connection reset) even after a real server
@@ -263,14 +269,26 @@ var SH = {
     // both fall into the same catch and return the same null, silently
     // conflating "no transient" with "the network hiccuped" -- exactly the
     // kind of noise-as-conclusion this project avoids everywhere else.
+    //
+    // Logged rather than silently returning null on final failure: 3 retries
+    // narrows how often a flake is mistaken for "no transient" but cannot
+    // fully eliminate the ambiguity, since a genuinely undecodable clip fails
+    // identically on every attempt. The log line is what lets a person
+    // reading the harness's output tell the two apart after the fact.
     for (var attempt = 0; attempt < 3 && !audio; attempt++) {
       try {
         var buf = await (await fetch(clipUrl)).arrayBuffer();
-        var actx = new (window.AudioContext || window.webkitAudioContext)();
         audio = await actx.decodeAudioData(buf);
-      } catch (e) { if (attempt === 2) return null; }
+      } catch (e) {
+        if (attempt === 2) {
+          log('findImpactAudio: giving up after 3 attempts -- ' + e.message);
+          actx.close();
+          return null;
+        }
+      }
     }
     var data = audio.getChannelData(0), rate = audio.sampleRate;
+    actx.close();
     var a = Math.max(0, Math.floor(t0 * rate));
     var b = Math.min(data.length, Math.ceil(t1 * rate));
     var win = Math.max(1, Math.round(rate * 0.005));
