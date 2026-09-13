@@ -92,5 +92,11 @@ chk('M4 noise floor never drops below click precision',
       [{ x: 0, y: 0 }, { x: 50, y: 50 }],
       [{ x: 0, y: 0 }, { x: 50, y: 50 }]);
     return r.noiseFloor === CLICK_PRECISION_PX && r.signal === false; })());
+chk('M4 magnitude exactly at the noise floor is still no signal (not >=)',
+  (() => { const r = correctedDelta(
+      { x: 0, y: 0 }, { x: CLICK_PRECISION_PX, y: 0 },
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }],
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }]);
+    return r.magnitude === r.noiseFloor && r.signal === false; })());
 
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
