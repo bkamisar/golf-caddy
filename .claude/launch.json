@@ -4,7 +4,7 @@
     {
       "name": "golf-caddy-http",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8940"],
+      "runtimeArgs": [".claude/range-server.py", "8940"],
       "port": 8940
     }
   ]
