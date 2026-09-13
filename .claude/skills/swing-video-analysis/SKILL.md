@@ -204,8 +204,10 @@ mutually exclusive, not a spectrum:
   is a safety net, not something to compute by hand — but per step 6, you
   shouldn't be measuring angle-unsupported candidates in the first place.
 
-A `signal: false` result never becomes a finding under any confidence
-tier — see step 6. If you're tempted to write one anyway because the
+A **case-3** result specifically (`refCount >= 2` and `signal: false` — see
+step 6) never becomes a finding under any confidence tier. A case-2 result
+(`refCount < 2`) is not this — it can and should still become a `visual`
+finding. If you're tempted to write a case-3 result anyway because the
 number "looked close," that's exactly the instinct this gate exists to
 override.
 
