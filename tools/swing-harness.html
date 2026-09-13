@@ -309,8 +309,44 @@ var SH = {
     var meanJump = nJump ? sumJump / nJump : 0;
     if (!best.time || !meanJump || best.jump < meanJump * 8) return null;
     return { time: best.time, jump: best.jump, prominence: best.jump / meanJump };
+  },
+
+  // Arms the next canvas click to record a landmark under this label. The click
+  // handler converts to video-pixel space and draws a crosshair, so a misplaced
+  // click is caught by looking at the next screenshot rather than becoming a
+  // silent error in the measurement.
+  mark: function (label) { pendingLabel = label; return 'armed: ' + label; },
+  points: function () { return marks.slice(); },
+  clearPoints: function () { marks = []; render(); return 'cleared'; },
+
+  // Draws the measurement between two named marks so the delta is visible in the
+  // screenshot rather than asserted in prose.
+  annotate: function (labelA, labelB, caption) {
+    var A = marks.filter(function (m) { return m.label === labelA; })[0];
+    var B = marks.filter(function (m) { return m.label === labelB; })[0];
+    if (!A || !B) return 'missing mark';
+    var ax = (A.x - view.cropX) * view.zoom, ay = (A.y - view.cropY) * view.zoom;
+    var bx = (B.x - view.cropX) * view.zoom, by = (B.y - view.cropY) * view.zoom;
+    ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ff0'; ctx.font = 'bold 15px monospace';
+    ctx.fillText(caption || '', Math.min(ax, bx) + 8, Math.min(ay, by) - 8);
+    return 'annotated';
   }
 };
+
+c.addEventListener('click', function (e) {
+  var r = c.getBoundingClientRect();
+  var scr = { x: (e.clientX - r.left) * (c.width / r.width),
+              y: (e.clientY - r.top) * (c.height / r.height) };
+  var p = screenToVideo(scr, view);
+  if (!p) return;
+  marks.push({ x: p.x, y: p.y, label: pendingLabel, time: v.currentTime });
+  log('marked ' + pendingLabel + ' at ' + p.x.toFixed(1) + ',' + p.y.toFixed(1));
+  pendingLabel = null;
+  render();
+});
 </script>
 </body>
 </html>
