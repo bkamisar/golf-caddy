@@ -14,6 +14,20 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     # forever and, since ThreadingHTTPServer gives each request its own
     # thread, must not take the rest of the server down with it either.
     timeout = 30
+
+    # Class-level default so copyfile() below can always read this attribute
+    # safely. send_head()'s directory branch delegates straight to the base
+    # class and returns without ever setting it on the instance -- without
+    # this default, a request to a directory (e.g. a bare "GET /") crashes
+    # that connection's thread with an AttributeError inside copyfile(),
+    # which on a browser reusing a keep-alive connection can poison a later,
+    # completely unrelated request on the same socket. Confirmed exactly this
+    # way: a plain (non-Range) fetch of a large file intermittently failed
+    # with "Failed to fetch" after the body's headers had already arrived
+    # correctly, while an equivalent Range request for the identical bytes
+    # never failed -- because only the Range code path was reliably setting
+    # this attribute before every copyfile() call.
+    _range_remaining = None
     def send_head(self):
         path = self.translate_path(self.path)
         if os.path.isdir(path):
@@ -43,7 +57,22 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-Length', str(file_len))
         self.send_header('Accept-Ranges', 'bytes')
         self.end_headers()
-        self._range_remaining = None
+        # file_len, not None: a plain 200 response is "the range that happens
+        # to be the whole file", so it goes through the exact same copyfile()
+        # loop as a real Range request rather than a separate delegation to
+        # the base class's own copyfile (shutil.copyfileobj). That delegation
+        # used to be the plain-200 path here, and it has no protection
+        # against a dropped connection mid-transfer -- confirmed as a real,
+        # reproducible failure: a plain fetch().arrayBuffer() of this file
+        # over the sandboxed Browser pane's fetch (but not an equivalent
+        # Range request for the identical bytes, and not a real <video>
+        # element load, both of which only ever hit the Range branch)
+        # intermittently failed with "Failed to fetch" after headers had
+        # already arrived correctly -- i.e. a mid-transfer disconnect that
+        # the Range path's try/except would have absorbed silently. Unifying
+        # onto one code path removes the untested, more fragile alternative
+        # entirely rather than leaving a second implementation to diverge.
+        self._range_remaining = file_len
         return f
 
     def _parse_range(self, range_header, file_len):
@@ -54,9 +83,9 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         return start, min(end, file_len - 1)
 
     def copyfile(self, source, outputfile):
-        if self._range_remaining is None:
-            return super().copyfile(source, outputfile)
         remaining = self._range_remaining
+        if remaining is None:
+            return super().copyfile(source, outputfile)
         bufsize = 64 * 1024
         try:
             while remaining > 0:
