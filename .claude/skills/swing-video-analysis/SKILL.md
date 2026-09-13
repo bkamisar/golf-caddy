@@ -157,19 +157,32 @@ judgment call in the whole pipeline; everything after it is arithmetic. If
 a crosshair is off, `SH.mark()` the same label again and re-click — the
 harness replaces the prior point under that label rather than keeping both.
 
-**Reading the result:**
+**Reading the result — check in this order, since a `null`-vs-real-object
+check alone is not enough:**
 
-- **`signal: true`** — this is a `measured` finding (step 7). Proceed to
-  write it.
-- **`signal: false`** (returned as a real object, not `null` — this happens
-  whenever `refCount` is 2+ but the corrected movement doesn't clearly
-  exceed the noise floor) — **report no signal for this candidate and write
-  nothing from this measurement.** Not a weak finding — nothing. This is
-  the ONLY outcome for this case; don't reclassify a `signal: false` result
-  as `speculative` or any other confidence tier.
-- **`null`** — fewer than two static references were available (0 or 1), so
-  no correction could be attempted at all. This isn't a "no signal" result,
-  it's "no measurement was possible" — see the `visual` tier in step 7.
+1. **Result is `null`** — this only happens with zero static references
+   (`cameraDrift` refuses outright). No correction was attempted at all —
+   see the `visual` tier in step 7.
+2. **Result is a real object with `refCount < 2`** (i.e. exactly one
+   reference) — `correctedDelta` still computes a number here, but with
+   only one point there's nothing to check that reference against, so
+   `signal` is unconditionally `false` regardless of the movement's size.
+   Route this to the **`visual`** tier too, the same as case 1 — don't let
+   `signal: false` here read as "measured and found nothing," because no
+   reliable correction was actually possible.
+3. **Result is a real object with `refCount >= 2` and `signal: false`** —
+   two or more references were available, drift was genuinely correctable,
+   and the corrected movement still didn't clearly exceed the noise floor.
+   **This is the only case that means "report no signal and write nothing
+   from this measurement."** Not a weak finding — nothing, and not
+   `speculative` either.
+4. **Result is a real object with `signal: true`** — a `measured` finding
+   (step 7). Proceed to write it.
+
+Check `refCount` before looking at `signal` — a `signal: false` object with
+`refCount` 0 or 1 means something different from one with `refCount` 2+,
+and treating them the same silently discards an honest `visual` observation
+as if it were a checked-and-empty measurement.
 
 ## 7. Confidence
 
@@ -180,10 +193,11 @@ mutually exclusive, not a spectrum:
   `signal: true`.
 - **`visual`** — either there's no clean landmark-pair delta for this kind
   of observation at all (grip, finish balance — these are read directly off
-  a frame, not from a computed delta), or `correctedDelta(...)` returned
-  `null` (fewer than two static references were available). Either way,
-  this is an honest, eyeballed observation, not a computed one — say so in
-  the `note` field.
+  a frame, not from a computed delta), or `correctedDelta(...)`'s result
+  falls into case 1 or 2 above (`null`, or a real object with `refCount < 2`)
+  — fewer than two usable static references, so no reliable correction was
+  possible regardless of what `signal` says. Either way, this is an honest,
+  eyeballed observation, not a computed one — say so in the `note` field.
 - **`speculative`** — the confirmed camera angle can't support this finding
   per `FINDING_TAXONOMY`'s `angles`. `gradeFinding()` in `range.html`
   applies this automatically regardless of what confidence is set, so this
