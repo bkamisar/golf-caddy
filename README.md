@@ -19,6 +19,40 @@ API key.
 Publish this repo via GitHub Desktop → repo Settings → Pages → deploy from
 `main` root. Then bookmark it on your phone for the course.
 
+## Running your own copy
+
+Everything here travels with a fork — the three pages, the analytics, the
+hole-level and video tooling, and both Claude Code skills. There is nothing
+hardcoded to one person: no names, no account, no repo URL. The only thing
+that does *not* transfer is the data, which is the point.
+
+1. **Fork the repo** on GitHub.
+2. **Blank the data.** In your fork, replace the contents of each of these
+   with `[]` and commit — otherwise you inherit someone else's golf:
+
+   ```
+   data/rounds.json          data/range.json         data/hole-detail.json
+   data/recommendations.json data/findings.json
+   ```
+
+3. **Enable Pages** on your fork (Settings → Pages → deploy from root), and
+   bookmark that URL on your phone.
+4. **Paste your own data** — the Grint scores table into `index.html`, launch
+   monitor sessions into `range.html`. Both merge on re-paste, so there is no
+   way to double-count by pasting twice.
+
+For the parts Claude does rather than the page — reading scorecard screenshots
+into `data/hole-detail.json`, and analyzing swing video — you also need
+**Claude Code** and **Python**. Open a session in your clone and ask; the two
+skills in `.claude/skills/` are picked up automatically. See *Hole-level data*
+and *Swing findings* below for what each session actually does.
+
+One caution worth inheriting deliberately rather than by accident: **a fork
+published through Pages is public.** Scores and courses are one thing; video
+frames of yourself are another, and git history does not forget. The
+`.gitignore` already keeps clips and frames out, and the video skill re-checks
+before every commit — leave both in place.
+
 ## Give it to a friend
 
 Nothing in the code is tied to one person — no hardcoded name, repo link, or
@@ -218,6 +252,42 @@ clip cannot establish swing plane, and the app will not pretend otherwise.
 Video establishes positions and mechanism. Ball flight comes only from the
 launch monitor. The prompt states this rule explicitly so the two are never
 conflated.
+
+#### How a video session actually runs
+
+You need **Claude Code** and **Python** (already present on most machines).
+No ffmpeg, no paid app, no upload to anyone's server — the clip never leaves
+your computer.
+
+Start a session in this repo and say you want to analyze a swing video, giving
+the path to the clip. The `swing-video-analysis` skill in
+`.claude/skills/` takes it from there and does the rest itself:
+
+1. Copies the clip into `tools/clips/` (gitignored — see the warning below).
+2. Starts `.claude/range-server.py`, a small local-only static server. Python's
+   built-in one ignores HTTP Range requests, which silently breaks seeking in
+   a video; this one supports them. It binds to `127.0.0.1`, so nothing else
+   on your network can reach it, and it is stopped when the session ends.
+3. Opens `tools/swing-harness.html` in a browser, which loads the clip and
+   exposes an `SH` object for seeking, scanning motion, finding the impact
+   moment, and marking landmarks by clicking on frames.
+4. Measures, then writes findings here and commits them.
+
+**Camera work matters more than anything in the software.** Face-on or
+down-the-line, phone at hip height, 10–12 feet away, good light, and propped
+on something rather than handheld — camera shake is the largest single source
+of measurement noise, and the whole drift-correction step exists to fight it.
+An angled view is not fatal but it blocks most of the taxonomy: a clip that is
+neither face-on nor down-the-line can only support tempo, finish balance,
+backswing width, and grip. Old clips are still worth sending; they just yield
+fewer measured findings and more honest "no signal" results.
+
+**Your clips and frames are never committed.** `tools/clips/` and
+`tools/frames/` are gitignored, and the skill verifies `git status` is clean of
+media before every commit. This is deliberate: the repo is public and already
+ties a name to courses, dates, and scores — a face is the one piece that cannot
+be un-published once it is in git history. Conclusions travel as text in
+`data/findings.json`; pictures stay in the chat.
 
 ## Hole-level data
 
