@@ -114,6 +114,60 @@ function toInches(pixels, scaleRef) {
   return pixels * (scaleRef.inches / scaleRef.pixels);
 }
 /*MEASURE-END*/
+
+var v = document.getElementById('v');
+var c = document.getElementById('c');
+var ctx = c.getContext('2d', { willReadFrequently: true });
+var logEl = document.getElementById('log');
+var view = { cropX: 0, cropY: 0, zoom: 1 };
+var marks = [];
+var pendingLabel = null;
+var clipUrl = null;
+
+function log(msg) { logEl.textContent = String(msg); }
+
+function seek(t) {
+  return new Promise(function (res) {
+    if (Math.abs(v.currentTime - t) < 1e-4) return res(v.currentTime);
+    v.onseeked = function () { v.onseeked = null; res(v.currentTime); };
+    v.currentTime = t;
+  });
+}
+
+function render() {
+  var sw = c.width / view.zoom, sh = c.height / view.zoom;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.drawImage(v, view.cropX, view.cropY, sw, sh, 0, 0, c.width, c.height);
+  marks.forEach(function (m) {
+    var x = (m.x - view.cropX) * view.zoom, y = (m.y - view.cropY) * view.zoom;
+    ctx.strokeStyle = '#0f0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.lineTo(x + 12, y);
+    ctx.moveTo(x, y - 12); ctx.lineTo(x, y + 12); ctx.stroke();
+    ctx.fillStyle = '#0f0'; ctx.font = '13px monospace';
+    ctx.fillText(m.label || '', x + 14, y - 4);
+  });
+}
+
+var SH = {
+  load: function (url) {
+    clipUrl = url;
+    return new Promise(function (res, rej) {
+      v.onloadedmetadata = function () {
+        view = { cropX: 0, cropY: 0,
+                 zoom: Math.min(c.width / v.videoWidth, c.height / v.videoHeight) };
+        res({ duration: v.duration, width: v.videoWidth, height: v.videoHeight });
+      };
+      v.onerror = function () { rej(new Error('decode failed: ' + (v.error && v.error.message))); };
+      v.src = url;
+    });
+  },
+  seek: function (t) { return seek(t).then(function (at) { render(); return at; }); },
+  setView: function (cropX, cropY, zoom) {
+    view = { cropX: cropX, cropY: cropY, zoom: zoom }; render(); return view;
+  },
+  getView: function () { return view; },
+  time: function () { return v.currentTime; }
+};
 </script>
 </body>
 </html>
