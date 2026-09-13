@@ -136,10 +136,17 @@ function log(msg) { logEl.textContent = String(msg); }
 // explicitly rejecting whichever seek is still outstanding when a new one
 // starts, so a caller that violates the contract gets a catchable error
 // instead of a silent hang.
+//
+// Deliberately always assigns currentTime and waits for `seeked`, even when
+// the target already equals v.currentTime -- verified empirically that the
+// browser still fires `seeked` on a same-value reassignment, and skipping it
+// (an earlier version of this function did, as an optimization) let a freshly
+// loaded, never-painted video hand back a solid-black frame at t=0 while
+// still reporting readyState 4. Every caller depends on the returned frame
+// actually being painted, so there is no safe case to skip this wait.
 function seek(t) {
   if (pendingSeekReject) { pendingSeekReject(new Error('seek superseded by a newer seek')); pendingSeekReject = null; }
   return new Promise(function (res, rej) {
-    if (Math.abs(v.currentTime - t) < 1e-4) return res(v.currentTime);
     pendingSeekReject = rej;
     v.onseeked = function () {
       v.onseeked = null;
