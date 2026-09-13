@@ -246,6 +246,40 @@ var SH = {
       prev = cur.slice();
     }
     return out;
+  },
+
+  // Impact from the audio transient: the strike is a sharp jump in short-window
+  // RMS, which pins impact far more precisely than the motion peak, whose true
+  // frame is smeared by blur and sampling. Returns null when the clip has no
+  // decodable audio or no audibly sharp strike, so the caller falls back.
+  findImpactAudio: async function (t0, t1) {
+    var audio;
+    try {
+      var buf = await (await fetch(clipUrl)).arrayBuffer();
+      var actx = new (window.AudioContext || window.webkitAudioContext)();
+      audio = await actx.decodeAudioData(buf);
+    } catch (e) { return null; }
+    var data = audio.getChannelData(0), rate = audio.sampleRate;
+    var a = Math.max(0, Math.floor(t0 * rate));
+    var b = Math.min(data.length, Math.ceil(t1 * rate));
+    var win = Math.max(1, Math.round(rate * 0.005));
+    var best = { time: null, jump: 0 }, prevE = null, sumJump = 0, nJump = 0;
+    for (var i = a; i + win < b; i += win) {
+      var e = 0;
+      for (var j = i; j < i + win; j++) e += data[j] * data[j];
+      e = Math.sqrt(e / win);
+      if (prevE != null) {
+        var jump = e - prevE;
+        if (jump > 0) { sumJump += jump; nJump++; }
+        if (jump > best.jump) best = { time: i / rate, jump: jump };
+      }
+      prevE = e;
+    }
+    // A transient only counts if it clearly stands out from ordinary variation;
+    // otherwise the track is silent or merely noisy and motion should be used.
+    var meanJump = nJump ? sumJump / nJump : 0;
+    if (!best.time || !meanJump || best.jump < meanJump * 8) return null;
+    return { time: best.time, jump: best.jump, prominence: best.jump / meanJump };
   }
 };
 </script>
