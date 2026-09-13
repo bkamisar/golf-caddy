@@ -16,9 +16,12 @@
 <script>
 /*MEASURE-START*/
 // Pure geometry and gating for swing measurement. No DOM access in this block —
-// it is extracted and run in Node by test-swing-measure.js. Declare with
-// `var`/`function` only: `const`/`let` do not become visible to the calling
-// scope there, so the tests could not see them.
+// it is extracted and run in Node by test-swing-measure.js via
+// vm.runInThisContext. Declare with `var`/`function` only, matching the
+// convention of this project's three other extracted-block harnesses (which
+// use plain `eval` and require it): those do NOT expose `const`/`let` to the
+// caller, so keeping this block consistent with them means it stays portable
+// if it is ever extracted the same way elsewhere.
 
 // Even with perfect static references, a hand-placed landmark is only good to a
 // pixel or two. No measurement is ever treated as more precise than this.
@@ -28,10 +31,11 @@ var CLICK_PRECISION_PX = 2;
 // pixel coordinates. The harness renders a zoomed crop so landmarks can be
 // placed precisely; this is the inverse of that transform.
 function screenToVideo(pt, view) {
-  if (!pt || !view || !view.zoom) return null;
+  if (!pt || !view || !view.zoom || view.cropX == null || view.cropY == null) return null;
   return { x: view.cropX + pt.x / view.zoom, y: view.cropY + pt.y / view.zoom };
 }
 
+// Returns b minus a, so a positive dx/dy means the point moved right/down.
 function pointDelta(a, b) {
   if (!a || !b) return null;
   return { dx: b.x - a.x, dy: b.y - a.y };

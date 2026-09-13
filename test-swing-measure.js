@@ -18,13 +18,19 @@ chk('M1 crop origin is added back',
   (() => { const p = screenToVideo({ x: 100, y: 50 }, { cropX: 300, cropY: 200, zoom: 2 });
     return p.x === 350 && p.y === 225; })());
 chk('M1 missing view returns null', screenToVideo({ x: 1, y: 1 }, null) === null);
+chk('M1 missing point returns null', screenToVideo(null, { cropX: 0, cropY: 0, zoom: 1 }) === null);
 chk('M1 zero zoom returns null rather than dividing by zero',
   screenToVideo({ x: 1, y: 1 }, { cropX: 0, cropY: 0, zoom: 0 }) === null);
+chk('M1 missing cropX/cropY returns null rather than NaN',
+  screenToVideo({ x: 1, y: 1 }, { zoom: 1 }) === null);
+chk('M1 a zero crop origin is not treated as missing',
+  screenToVideo({ x: 5, y: 5 }, { cropX: 0, cropY: 0, zoom: 1 }) !== null);
 
 // M2. pointDelta
 chk('M2 delta is b minus a',
   (() => { const d = pointDelta({ x: 10, y: 10 }, { x: 13, y: 4 });
     return d.dx === 3 && d.dy === -6; })());
-chk('M2 missing point returns null', pointDelta(null, { x: 1, y: 1 }) === null);
+chk('M2 missing first point returns null', pointDelta(null, { x: 1, y: 1 }) === null);
+chk('M2 missing second point returns null', pointDelta({ x: 1, y: 1 }, null) === null);
 
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));
