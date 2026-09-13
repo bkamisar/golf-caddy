@@ -131,10 +131,45 @@ screenshotting each candidate timestamp separately.
 **Visually confirm every position before using it** — `SH.seek(t)` then a
 screenshot. These are heuristics, not certainties.
 
+### Pin the impact frame by the ball, and never be one frame late
+
+This matters more than any other timing decision in the method, so do it
+even when the motion peak or audio looks convincing. **Step through the
+candidate frames and find the last one with the ball still on the
+tee/mat/ground; the strike is between that frame and the next.** Use that
+last-ball-present frame for any at-impact measurement.
+
+The reason is that the body stands up violently in the follow-through, so a
+measurement taken one frame late is not slightly wrong, it is wrong by a
+large multiple. Measured on a real clip: head rise from address read
+**20.3px at the last ball-present frame and 53.5px one 0.033s frame later**
+— 33 of those 53 pixels accumulated in that single post-impact frame. Using
+the later frame would have overstated the finding by 2.6x, and nothing in
+the numbers themselves would have flagged it; both frames return
+`signal: true` with a healthy signal-to-noise ratio. A confident wrong
+answer is exactly the failure this whole method exists to prevent.
+
+This also means a motion peak is not good enough on its own to locate
+impact — the cropped-energy peak on that same swing sat at or just after
+the strike, not on it.
+
 If the impact frame is too motion-blurred to place a landmark on
 confidently, use the nearest sharp frame instead and say so explicitly, or
 decline that specific measurement. Never place a landmark on a blur and
 report the result as precise.
+
+### Landmark choice, and what a rise measurement really claims
+
+Prefer a high-contrast, repeatably identifiable point over an
+anatomically-ideal but fuzzy one. On real footage the crown of a cap
+against sky is far easier to mark consistently than a seat or belt-line
+silhouette, and head rise is a legitimate down-the-line early-extension
+proxy.
+
+But state the limit honestly: if the body rotates between the two frames,
+the topmost silhouette point is not guaranteed to be the same anatomical
+point, so part of any measured rise is rotation rather than translation.
+Record such a result as an upper bound, not a clean vertical displacement.
 
 Four positions is the default, not a ceiling — pull an extra frame
 (e.g. mid-downswing, shaft-parallel) only when a specific candidate finding
@@ -222,6 +257,16 @@ Check `refCount` before looking at `signal` — a `signal: false` object with
 `refCount` 0 or 1 means something different from one with `refCount` 2+,
 and treating them the same silently discards an honest `visual` observation
 as if it were a checked-and-empty measurement.
+
+**Making a pixel figure interpretable without inventing a scale.** "The
+head rose 20px" means nothing to a reader. `toInches` will (correctly)
+refuse unless a known-size object sits at the *same depth* as what you
+measured — a golf ball in frame is usually further from the camera than the
+player's upper body, so converting through it inflates the answer. The
+honest alternative is a ratio against another measurement you took in the
+same frame at the same depth: mark crown and chin, and report the rise in
+**head-heights**. That is two measured pixel quantities divided by each
+other, so it invents nothing, and it is immediately intuitive.
 
 ## 7. Confidence
 

@@ -24,5 +24,18 @@
     "lastConfirmed": "2026-09-13",
     "status": "open",
     "note": "Eyeballed from a filmstrip, NOT quantified -- an attempt to back it with a player-cropped frame-difference series failed and should not be repeated blind on outdoor footage like this. The settled-finish median (1.42) sat inside the range of the backswing's own values (1.5-2.3) with excursions to 2.70, because wind-blown reeds behind the player and handheld camera shake put the noise floor at the same level as the body motion being measured. The visual observation stands on its own; there is no number behind it."
+  },
+  {
+    "id": "early-extension-iron-down-the-line",
+    "finding": "early-extension",
+    "clubs": ["Iron"],
+    "assessment": "neutral",
+    "confidence": "measured",
+    "measurement": "magnitude: 31.4px, noiseFloor: 2px (of which vertical rise 20.3px = 0.28 head-heights), observed in 1 of 1 swings measured",
+    "cameraAngle": "down-the-line",
+    "firstNoted": "2026-09-13",
+    "lastConfirmed": "2026-09-13",
+    "status": "open",
+    "note": "Range session, 2026-07-04 clip, swing at 9.6-10.5s. Head crown tracked from address (9.600s) to impact (10.450s), corrected for camera drift using two static treeline silhouette tips; the two references agreed to within 0.245px, so the camera was near-still and the noise floor fell back to the 2px click-precision floor. Signal is 15.7x that floor. Baseline only -- assessment is neutral because this project carries no population baseline by design, so there is no basis to call 0.28 head-heights a fault; it is recorded so a later video can be compared via isImprovement. Scale: expressed in head-heights (crown-to-chin 73px at address) rather than inches, because the only known-size object in frame is the ball, which sits further from the camera than the head and would therefore inflate any inch conversion -- toInches correctly returned null. TWO CAVEATS. (1) Impact frame accuracy dominates this measurement: at 10.500s, one 0.033s frame later, the same rise reads 53.5px (0.73 head-heights) -- 33 of those pixels accumulate in that single post-impact frame as the body stands up naturally through the follow-through. 10.450s was chosen because it is the last frame with the ball still on the mat. Measuring one frame late would have overstated this finding by 2.6x. (2) The head also rotates toward the target between the two frames, so the topmost silhouette point is not guaranteed to be the same anatomical point; some share of the 20.3px is rotation rather than translation, making this an upper bound on true vertical rise."
   }
 ]
