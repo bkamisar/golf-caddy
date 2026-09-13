@@ -33,4 +33,64 @@ chk('M2 delta is b minus a',
 chk('M2 missing first point returns null', pointDelta(null, { x: 1, y: 1 }) === null);
 chk('M2 missing second point returns null', pointDelta({ x: 1, y: 1 }, null) === null);
 
+// M3. cameraDrift — static background points paired by index. `spread` is how
+// much they disagree about the shift, which is the noise floor for this pair
+// of frames.
+chk('M3 two references shifted identically give that shift and zero spread',
+  (() => { const d = cameraDrift(
+      [{ x: 10, y: 10 }, { x: 90, y: 40 }],
+      [{ x: 13, y: 14 }, { x: 93, y: 44 }]);
+    return d.dx === 3 && d.dy === 4 && near(d.spread, 0); })());
+chk('M3 disagreeing references give the mean shift',
+  (() => { const d = cameraDrift(
+      [{ x: 0, y: 0 }, { x: 0, y: 0 }],
+      [{ x: 2, y: 0 }, { x: 6, y: 0 }]);
+    return d.dx === 4 && d.dy === 0; })());
+chk('M3 spread is the largest deviation from the mean shift',
+  (() => { const d = cameraDrift(
+      [{ x: 0, y: 0 }, { x: 0, y: 0 }],
+      [{ x: 2, y: 0 }, { x: 6, y: 0 }]);
+    return near(d.spread, 2); })());
+chk('M3 mismatched reference counts return null',
+  cameraDrift([{ x: 0, y: 0 }], [{ x: 0, y: 0 }, { x: 1, y: 1 }]) === null);
+chk('M3 empty references return null', cameraDrift([], []) === null);
+
+// M4. correctedDelta — the gate. A landmark that merely moved with the camera
+// must report no signal.
+chk('M4 landmark that moved exactly with the camera reports no signal',
+  (() => { const r = correctedDelta(
+      { x: 100, y: 100 }, { x: 110, y: 100 },
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }],
+      [{ x: 10, y: 0 }, { x: 60, y: 50 }]);
+    return near(r.dx, 0) && near(r.magnitude, 0) && r.signal === false; })());
+chk('M4 movement beyond drift is reported net of it',
+  (() => { const r = correctedDelta(
+      { x: 100, y: 100 }, { x: 130, y: 100 },
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }],
+      [{ x: 10, y: 0 }, { x: 60, y: 50 }]);
+    return near(r.dx, 20) && r.signal === true; })());
+chk('M4 riseUp is positive when the landmark rose on screen',
+  (() => { const r = correctedDelta(
+      { x: 100, y: 200 }, { x: 100, y: 170 },
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }],
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }]);
+    return near(r.riseUp, 30) && near(r.dy, -30); })());
+chk('M4 a single reference never yields signal, however large the movement',
+  (() => { const r = correctedDelta(
+      { x: 0, y: 0 }, { x: 500, y: 0 },
+      [{ x: 0, y: 0 }], [{ x: 0, y: 0 }]);
+    return r.refCount === 1 && r.signal === false; })());
+chk('M4 drift-dominated frames report no signal',
+  (() => { const r = correctedDelta(
+      { x: 0, y: 0 }, { x: 12, y: 0 },
+      [{ x: 0, y: 0 }, { x: 50, y: 0 }],
+      [{ x: 0, y: 0 }, { x: 90, y: 0 }]);
+    return r.signal === false; })());
+chk('M4 noise floor never drops below click precision',
+  (() => { const r = correctedDelta(
+      { x: 0, y: 0 }, { x: 1, y: 0 },
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }],
+      [{ x: 0, y: 0 }, { x: 50, y: 50 }]);
+    return r.noiseFloor === CLICK_PRECISION_PX && r.signal === false; })());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

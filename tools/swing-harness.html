@@ -40,6 +40,54 @@ function pointDelta(a, b) {
   if (!a || !b) return null;
   return { dx: b.x - a.x, dy: b.y - a.y };
 }
+
+// Camera drift between two frames, estimated from static background points
+// paired by index: refsA[i] and refsB[i] are the same real-world point. Their
+// disagreement is the noise floor for anything measured between these frames.
+function cameraDrift(refsA, refsB) {
+  if (!refsA || !refsB || !refsA.length || refsA.length !== refsB.length) return null;
+  var shifts = [];
+  for (var i = 0; i < refsA.length; i++) {
+    var d = pointDelta(refsA[i], refsB[i]);
+    if (!d) return null;
+    shifts.push(d);
+  }
+  var mdx = 0, mdy = 0;
+  shifts.forEach(function (s) { mdx += s.dx; mdy += s.dy; });
+  mdx /= shifts.length; mdy /= shifts.length;
+  var spread = 0;
+  shifts.forEach(function (s) {
+    var dev = Math.sqrt((s.dx - mdx) * (s.dx - mdx) + (s.dy - mdy) * (s.dy - mdy));
+    if (dev > spread) spread = dev;
+  });
+  return { dx: mdx, dy: mdy, spread: spread };
+}
+
+// Landmark movement with camera drift removed, plus the gate deciding whether it
+// means anything. `signal` is false when the corrected movement is not clearly
+// larger than the frames' own noise floor, or when fewer than two static
+// references were available to estimate drift at all — reported as no signal,
+// never as a small finding.
+function correctedDelta(landmarkA, landmarkB, refsA, refsB) {
+  var raw = pointDelta(landmarkA, landmarkB);
+  var drift = cameraDrift(refsA, refsB);
+  if (!raw || !drift) return null;
+  var dx = raw.dx - drift.dx;
+  var dy = raw.dy - drift.dy;
+  var magnitude = Math.sqrt(dx * dx + dy * dy);
+  var noiseFloor = Math.max(drift.spread, CLICK_PRECISION_PX);
+  return {
+    dx: dx,
+    dy: dy,
+    // Screen y grows downward, so a landmark that rose has negative dy. This
+    // field exists to stop that sign flip from becoming a wrong finding.
+    riseUp: -dy,
+    magnitude: magnitude,
+    noiseFloor: noiseFloor,
+    refCount: refsA.length,
+    signal: refsA.length >= 2 && magnitude > noiseFloor
+  };
+}
 /*MEASURE-END*/
 </script>
 </body>
