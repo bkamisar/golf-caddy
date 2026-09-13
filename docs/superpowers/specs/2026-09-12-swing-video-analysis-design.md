@@ -80,6 +80,27 @@ findings and already reads `video`-sourced recommendations via
 design goal, not an accident — it is why consistency data goes in the existing
 free-text `measurement` field rather than a new one.
 
+## Filming guidance — advisory, never a gate
+
+Better input yields more `measured` findings and fewer `no signal` results:
+face-on or down-the-line, phone at hip height, 10–12 feet away, good light, and
+above all **propped on something rather than handheld** — camera drift is the
+single largest source of measurement noise, and a stationary phone removes it at
+the source.
+
+This is advice for future clips only. Existing footage cannot be re-shot, so the
+method must degrade rather than refuse:
+
+| Shortfall | Consequence |
+|---|---|
+| Handheld shake | Drift correction absorbs it; noise floor rises, so small movements return no signal |
+| Awkward angle | Angle gating downgrades unsupportable findings; fewer findings, not a failure |
+| Poor light or too distant | Landmarks harder to place; confidence caps at `visual`, or the measurement is declined |
+| No usable audio transient | Motion-peak fallback for impact, method stated |
+
+The invariant: a degraded clip produces fewer confident findings, never a
+confident guess.
+
 ## Method
 
 ### 1. Setup
@@ -100,13 +121,29 @@ continuous motion — ask the user for rough timestamps rather than guess.
 
 ### 3. Locate the four positions
 
-Within the chosen swing's window, the same energy curve locates them: impact is
-the peak, address is the last quiet frame before the rise, top of backswing is
-the local dip between them (the club momentarily stops), finish is where motion
-settles.
+Impact is found from **audio first**: the strike is a sharp transient, decodable
+through the Web Audio API, and it pins impact far more precisely than motion
+does — the motion peak is smeared by blur and frame sampling. Both known clips
+carry an audio track, but a track can be near-silent, so the transient must be
+verified rather than assumed. With no usable transient, fall back to the motion
+peak and **state which method was used**, since it affects how precisely impact
+is pinned.
 
-This is heuristic, so each position is visually confirmed before use. Those four
-screenshots are the main image cost of a session.
+The energy curve locates the rest: address is the last quiet frame before the
+rise, top of backswing is the local dip (the club momentarily stops), finish is
+where motion settles.
+
+These are heuristics, so each position is visually confirmed before use. Those
+four screenshots are the main image cost of a session.
+
+Four is the default set, not a limit. Pull additional positions on demand when a
+candidate finding needs one — shaft-parallel in the downswing, for instance, is
+where casting and plane problems actually show. Extracting a fixed larger set
+every time would cost images to re-confirm what is already established.
+
+Record **which club was hit**, supplied by the user, into the finding's `clubs`
+field. A driver swing and a wedge swing legitimately differ, and a finding that
+does not say which it came from cannot be compared later.
 
 ### 4. Camera angle
 
@@ -232,6 +269,34 @@ after a real session shows the text is insufficient at the range.
 **Pose estimation (MediaPipe).** Would replace manual landmark clicking with
 model-detected joints and make the analysis fully automatic. Pending
 verification that a Python 3.14 build exists. This is the upgrade path.
+
+## Rejected, with reasons
+
+Considered while reviewing competing tools (BirdieSwing, Sportsbox 3D, 18Birdies)
+on 2026-09-12 and deliberately not adopted.
+
+**No population or tour baseline comparison.** Sportsbox compares measurements
+against tour and amateur ranges; that is a real capability this design will not
+have, and the gap should be stated honestly rather than papered over. It is the
+same problem the putting analysis already faced and answered: published
+baselines are tour- or scratch-calibrated, and a self-calibrated one is circular.
+The answer is the same here — **track change in the user's own measurement over
+time**, which needs no population baseline and is what actually matters for
+improvement. Do not bolt on "tour average" comparisons later.
+
+**No 0–100 swing score.** A single summary number implies a rubric that does not
+exist and is not reproducible — the same false precision this project rejects
+everywhere else.
+
+**No auto-generated drill prescriptions.** Prescription is the least reliable
+output available here. Where a drill belongs at all is the coach debrief, which
+sees findings alongside real launch-monitor data.
+
+A fair criticism from that review, worth keeping in mind: AI swing feedback
+without fixed rubrics produces variable assessments of identical swings. That
+applies to `visual`-confidence findings here (grip, finish balance) and is an
+argument for measuring wherever possible and being stingy with `visual`.
+Measured findings are reproducible by construction.
 
 ## Out of scope
 
