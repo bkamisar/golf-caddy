@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Swing harness</title>
+<style>
+  body { margin: 0; background: #111; color: #eee; font: 12px monospace; }
+  #c { display: block; cursor: crosshair; }
+  #log { padding: 6px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<video id="v" playsinline muted style="display:none"></video>
+<canvas id="c" width="900" height="700"></canvas>
+<div id="log"></div>
+<script>
+/*MEASURE-START*/
+// Pure geometry and gating for swing measurement. No DOM access in this block —
+// it is extracted and run in Node by test-swing-measure.js. Declare with
+// `var`/`function` only: `const`/`let` do not become visible to the calling
+// scope there, so the tests could not see them.
+
+// Even with perfect static references, a hand-placed landmark is only good to a
+// pixel or two. No measurement is ever treated as more precise than this.
+var CLICK_PRECISION_PX = 2;
+
+// Maps a point clicked on the displayed canvas back into the source video's own
+// pixel coordinates. The harness renders a zoomed crop so landmarks can be
+// placed precisely; this is the inverse of that transform.
+function screenToVideo(pt, view) {
+  if (!pt || !view || !view.zoom) return null;
+  return { x: view.cropX + pt.x / view.zoom, y: view.cropY + pt.y / view.zoom };
+}
+
+function pointDelta(a, b) {
+  if (!a || !b) return null;
+  return { dx: b.x - a.x, dy: b.y - a.y };
+}
+/*MEASURE-END*/
+</script>
+</body>
+</html>
