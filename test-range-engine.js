@@ -1143,4 +1143,18 @@ chk('T47 findingsForPrompt states confidence and flags a downgrade', (() => {
 })());
 chk('T47 findingsForPrompt on empty input returns an empty array', findingsForPrompt([]).length === 0);
 
+// T48. The taxonomy carries the evergreen half of the explanation: what a
+// pattern IS never changes, only what a given swing did. Keeping it here means
+// the definition is written once rather than improvised per session.
+chk('T48 every taxonomy entry has a plainName and an explainer', (() => {
+  return Object.keys(FINDING_TAXONOMY).every(k => {
+    const t = FINDING_TAXONOMY[k];
+    return typeof t.plainName === 'string' && t.plainName.length > 0
+        && typeof t.explainer === 'string' && t.explainer.length > 20;
+  });
+})());
+chk('T48 plainName avoids the jargon term it is replacing', (() => {
+  return FINDING_TAXONOMY['early-extension'].plainName.indexOf('extension') < 0;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

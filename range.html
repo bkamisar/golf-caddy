@@ -950,15 +950,51 @@ function gapLabel(gapToNext) {
 // from a real session where a swing-plane claim was made from a front-on clip
 // and had to be retracted — the view simply cannot show it.
 var FINDING_TAXONOMY = {
-  'early-extension':             { label: 'early extension',                 angles: ['down-the-line'] },
-  'swing-plane':                 { label: 'swing plane',                     angles: ['down-the-line'] },
-  'low-point-control':           { label: 'low point control',               angles: ['front-on'] },
-  'weight-transfer-quality':     { label: 'weight transfer quality',         angles: ['front-on'] },
-  'static-lower-body-transition':{ label: 'static lower body at transition', angles: ['front-on'] },
-  'backswing-width-turn':        { label: 'backswing width and turn',        angles: null },
-  'finish-balance':              { label: 'finish balance',                  angles: null },
-  'grip-setup':                  { label: 'grip and setup',                  angles: null },
-  'tempo-sequencing':            { label: 'tempo and sequencing',            angles: null },
+  'early-extension': {
+    label: 'early extension', angles: ['down-the-line'],
+    plainName: 'standing up through the ball',
+    explainer: 'Your body rises out of its setup posture coming into impact instead of holding the angles you started with. It matters because it changes how far the club is from the ball at contact, which makes strikes inconsistent.'
+  },
+  'swing-plane': {
+    label: 'swing plane', angles: ['down-the-line'],
+    plainName: 'the path the club travels',
+    explainer: 'The tilt and direction of the path the club travels going back and coming down. It matters because a club arriving on a very different angle than it left on tends to produce a curve you then have to fight.'
+  },
+  'low-point-control': {
+    label: 'low point control', angles: ['front-on'],
+    plainName: 'where the club bottoms out',
+    explainer: 'Where the club reaches the bottom of its arc relative to the ball. It matters because an iron wants to bottom out just after the ball — bottoming out early is what produces fat and thin shots.'
+  },
+  'weight-transfer-quality': {
+    label: 'weight transfer quality', angles: ['front-on'],
+    plainName: 'shifting your weight forward',
+    explainer: 'Whether your weight actually moves onto your front foot through the downswing, or hangs back on your trail foot. It matters because hanging back moves the bottom of your swing behind the ball.'
+  },
+  'static-lower-body-transition': {
+    label: 'static lower body at transition', angles: ['front-on'],
+    plainName: 'starting down with your arms',
+    explainer: 'Whether your lower body starts the downswing, or your arms and shoulders start it while your legs stay put. It matters because the order things move in is where most easy speed comes from.'
+  },
+  'backswing-width-turn': {
+    label: 'backswing width and turn', angles: null,
+    plainName: 'width and turn going back',
+    explainer: 'How far your hands stay from your body and how far your shoulders rotate on the way back. It matters because together they set how much room you have to build speed coming down.'
+  },
+  'finish-balance': {
+    label: 'finish balance', angles: null,
+    plainName: 'holding your finish',
+    explainer: 'Whether you finish in a settled, balanced position and hold it, or have to step or stumble to catch yourself. It matters because losing balance at the end usually means something was off balance earlier.'
+  },
+  'grip-setup': {
+    label: 'grip and setup', angles: null,
+    plainName: 'grip and setup',
+    explainer: 'How you hold the club and how you stand to the ball before anything moves. It matters because it is the one part of the swing you can fix at full speed, without needing athletic timing.'
+  },
+  'tempo-sequencing': {
+    label: 'tempo and sequencing', angles: null,
+    plainName: 'swing rhythm',
+    explainer: 'The rhythm of the swing — how long you take going back compared with coming down. It matters because a repeatable rhythm does more for repeatable contact than any single position does.'
+  },
 };
 var VALID_ANGLES = ['down-the-line', 'front-on', 'other'];
 var VALID_STATUS = ['open', 'improving', 'resolved'];
