@@ -1057,6 +1057,31 @@ function findingsForPrompt(findings) {
   });
 }
 
+// Structured rows for the dashboard. Deliberately separate from
+// findingsForPrompt: that one serves a model and carries the full technical
+// record, this one serves the golfer reading the page and carries none of it.
+// Returns objects rather than strings so the page can lay out the heading, the
+// evergreen explainer and the per-swing text separately.
+function findingsForDisplay(findings) {
+  return openFindings(findings).map(function (f) {
+    var t = FINDING_TAXONOMY[f.finding];
+    var plain = (f.plain || '').trim();
+    return {
+      key: f.finding,
+      plainName: t ? t.plainName : f.finding,
+      label: t ? t.label : f.finding,
+      explainer: t ? t.explainer : '',
+      plain: plain,
+      clubs: f.clubs || [],
+      // A finding with no plain-language summary renders a visible notice
+      // rather than an empty card -- silent blankness would hide the fact that
+      // a session skipped writing one, which is exactly the kind of quiet gap
+      // this project surfaces instead of swallowing.
+      missingPlain: !plain
+    };
+  });
+}
+
 // ── Recommendations ──────────────────────────────────────────────────────────
 // A dated log of practice priorities, each with a criterion specific enough to
 // be checked later. Outcomes are never inferred: a criterion is free text

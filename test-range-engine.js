@@ -1157,4 +1157,36 @@ chk('T48 plainName avoids the jargon term it is replacing', (() => {
   return FINDING_TAXONOMY['early-extension'].plainName.indexOf('extension') < 0;
 })());
 
+chk('T48 findingsForDisplay pulls plainName and explainer from the taxonomy', (() => {
+  const r = findingsForDisplay([mkF({ plain: 'Your head rose a little.' })])[0];
+  return r.plainName === 'standing up through the ball'
+      && r.explainer === FINDING_TAXONOMY['early-extension'].explainer
+      && r.label === 'early extension';
+})());
+chk('T48 findingsForDisplay returns the finding own plain text', (() => {
+  const r = findingsForDisplay([mkF({ plain: 'Your head rose a little.' })])[0];
+  return r.plain === 'Your head rose a little.' && r.missingPlain === false;
+})());
+chk('T48 a finding with no plain text is flagged, not silently blank', (() => {
+  const r = findingsForDisplay([mkF({})])[0];
+  return r.missingPlain === true && r.plain === '';
+})());
+chk('T48 whitespace-only plain counts as missing', (() => {
+  return findingsForDisplay([mkF({ plain: '   ' })])[0].missingPlain === true;
+})());
+chk('T48 an unknown taxonomy key degrades to the raw key with no explainer', (() => {
+  const r = findingsForDisplay([mkF({ finding: 'feels-a-bit-off', plain: 'x' })])[0];
+  return r.plainName === 'feels-a-bit-off' && r.label === 'feels-a-bit-off' && r.explainer === '';
+})());
+chk('T48 resolved findings are excluded, same as the prompt view', (() => {
+  return findingsForDisplay([mkF({ status: 'resolved', plain: 'x' })]).length === 0;
+})());
+chk('T48 display carries no technical text, while the prompt still does', (() => {
+  const f = mkF({ plain: 'Your head rose a little.', note: 'noiseFloor 2px, signal 15.7x' });
+  const disp = JSON.stringify(findingsForDisplay([f]));
+  const prompt = findingsForPrompt([f])[0];
+  return disp.indexOf('noiseFloor') < 0 && disp.indexOf('15.7x') < 0
+      && prompt.indexOf('noiseFloor') >= 0;
+})());
+
 console.log('\n' + (fails ? fails + ' FAILURES' : 'ALL PASS'));

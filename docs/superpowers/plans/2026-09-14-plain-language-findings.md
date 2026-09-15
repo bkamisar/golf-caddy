@@ -154,7 +154,8 @@ Insert into `test-range-engine.js` immediately before the final `console.log` li
 chk('T48 findingsForDisplay pulls plainName and explainer from the taxonomy', (() => {
   const r = findingsForDisplay([mkF({ plain: 'Your head rose a little.' })])[0];
   return r.plainName === 'standing up through the ball'
-      && /setup posture/.test(r.explainer) && r.label === 'early extension';
+      && r.explainer === FINDING_TAXONOMY['early-extension'].explainer
+      && r.label === 'early extension';
 })());
 chk('T48 findingsForDisplay returns the finding own plain text', (() => {
   const r = findingsForDisplay([mkF({ plain: 'Your head rose a little.' })])[0];
