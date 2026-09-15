@@ -71,6 +71,28 @@ a single swing's number is exactly the kind of small-sample claim this
 project avoids stating as fact, and a full re-measurement of every swing is
 usually not worth its cost in this budget.
 
+**Don't assume a motion cluster is a swing — look at it.** A long clip can
+contain camera handling, walking, changing location, bending down for a
+ball, and the recording being stopped by hand, all of which register as
+motion energy comparable to or larger than an actual swing. Pull a filmstrip
+across every candidate cluster and confirm visually (address stance, a real
+backswing/downswing arc) before measuring anything. It is a completely valid
+outcome for a clip to contain only one real swing despite showing several
+energy spikes — say so plainly in the finding's note rather than silently
+measuring only the first one and implying the rest were equivalent.
+
+**Known failure mode: the video decoder can silently freeze after heavy
+seeking.** After many `seek()` calls in one session, `v.currentTime` and
+`v.readyState` can keep reporting correctly while the actually-decoded frame
+stops updating — `drawImage` silently returns the same stale pixels at every
+timestamp, with no error anywhere. This produces a false "no movement"
+measurement if it goes unnoticed. If two timestamps that should obviously
+look different come back with identical or near-identical pixel data, don't
+trust it — reload the clip with `SH.load(clipUrl)` and re-seek. Cheap
+sanity check before trusting any measurement session that has done a lot of
+seeking: sample a pixel at two very different timestamps and confirm they
+actually differ.
+
 ## 5. Locate the four key positions
 
 Try audio first: `await SH.findImpactAudio(t0, t1)` (t0/t1 bracketing the
