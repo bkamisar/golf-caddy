@@ -1591,10 +1591,21 @@ function render() {
   </div>
   <div class="sec"><h2>Open swing findings</h2>
     ${(() => {
-      const lines = findingsForPrompt(loadFindings());
-      return lines.length
-        ? lines.map(l => `<div class="note"><span class="dot"></span><span class="txt">${esc(l)}</span></div>`).join('')
-        : '<div class="note"><span class="dot"></span><span class="txt">None recorded. Video findings are written here from a Claude Code session — see the README.</span></div>';
+      const rows = findingsForDisplay(loadFindings());
+      if (!rows.length) return '<div class="note"><span class="dot"></span><span class="txt">None recorded. Video findings are written here from a Claude Code session — see the README.</span></div>';
+      return rows.map(r => {
+        const clubs = r.clubs.length ? ` — ${esc(r.clubs.join(', '))}` : '';
+        // The <em> notice is authored here, so it is intentionally not passed
+        // through esc(); r.plain is stored text and always is.
+        const body = r.missingPlain
+          ? '<em>No plain-language summary was written for this finding yet.</em>'
+          : esc(r.plain);
+        return '<div class="note"><span class="dot"></span><span class="txt">'
+          + `<b>${esc(r.plainName)}</b> <span class="flat">(${esc(r.label)})</span>${clubs}<br>`
+          + (r.explainer ? `<span class="flat">${esc(r.explainer)}</span><br>` : '')
+          + body
+          + '</span></div>';
+      }).join('');
     })()}
   </div>
   <div class="sec"><h2>Priority history</h2>
