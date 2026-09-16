@@ -923,15 +923,51 @@ function gapLabel(gapToNext) {
 // from a real session where a swing-plane claim was made from a front-on clip
 // and had to be retracted — the view simply cannot show it.
 var FINDING_TAXONOMY = {
-  'early-extension':             { label: 'early extension',                 angles: ['down-the-line'] },
-  'swing-plane':                 { label: 'swing plane',                     angles: ['down-the-line'] },
-  'low-point-control':           { label: 'low point control',               angles: ['front-on'] },
-  'weight-transfer-quality':     { label: 'weight transfer quality',         angles: ['front-on'] },
-  'static-lower-body-transition':{ label: 'static lower body at transition', angles: ['front-on'] },
-  'backswing-width-turn':        { label: 'backswing width and turn',        angles: null },
-  'finish-balance':              { label: 'finish balance',                  angles: null },
-  'grip-setup':                  { label: 'grip and setup',                  angles: null },
-  'tempo-sequencing':            { label: 'tempo and sequencing',            angles: null },
+  'early-extension': {
+    label: 'early extension', angles: ['down-the-line'],
+    plainName: 'standing up through the ball',
+    explainer: 'Whether you hold the posture you set up in through impact, or your hips and chest rise and drift toward the ball. It matters because standing up takes away the space your arms need to swing through, so the body has to find a compensation somewhere else.'
+  },
+  'swing-plane': {
+    label: 'swing plane', angles: ['down-the-line'],
+    plainName: 'how steep or shallow the club swings',
+    explainer: 'The tilt of the arc the club swings on — steep and upright, or shallow and more around your body. It matters because the direction the club is travelling at impact is one of the two things that decide where the ball starts and how it curves; the other is where the clubface points, which video from behind cannot show.'
+  },
+  'low-point-control': {
+    label: 'low point control', angles: ['front-on'],
+    plainName: 'where the club bottoms out',
+    explainer: 'Where the club reaches the bottom of its arc, relative to the ball. It matters because an iron strikes best when the low point is just past the ball; when it falls behind the ball you catch it fat, and the instinctive fix of rising up to miss the ground is where most thin shots come from.'
+  },
+  'weight-transfer-quality': {
+    label: 'weight transfer quality', angles: ['front-on'],
+    plainName: 'shifting your weight forward',
+    explainer: 'Whether your weight actually moves onto your front foot through the downswing, or hangs back on your trail foot. It matters because hanging back moves the bottom of your swing behind the ball.'
+  },
+  'static-lower-body-transition': {
+    label: 'static lower body at transition', angles: ['front-on'],
+    plainName: 'starting down with your upper body',
+    explainer: 'Whether your lower body starts the downswing, or your arms and shoulders start it while your legs stay put. It matters because the order things move in is where most easy speed comes from.'
+  },
+  'backswing-width-turn': {
+    label: 'backswing width and turn', angles: null,
+    plainName: 'how far back and how wide you swing',
+    explainer: 'How far your hands stay from your body and how far your shoulders rotate on the way back. It matters because together they set how much room you have to build speed coming down.'
+  },
+  'finish-balance': {
+    label: 'finish balance', angles: null,
+    plainName: 'holding your finish',
+    explainer: 'Whether you finish in a settled, balanced position and hold it, or have to step or stumble to catch yourself. It matters because losing balance at the end usually means something was off balance earlier.'
+  },
+  'grip-setup': {
+    label: 'grip and setup', angles: null,
+    plainName: 'how you hold the club and stand to it',
+    explainer: 'How you hold the club and how you stand to the ball before anything moves. It matters because it is the one part of the swing you can fix at full speed, without needing athletic timing.'
+  },
+  'tempo-sequencing': {
+    label: 'tempo and sequencing', angles: null,
+    plainName: 'rhythm, and the order things move',
+    explainer: 'Two related things: the rhythm of the swing — how long you take going back compared with coming down — and the order your body moves in on the way down. It matters because a repeatable rhythm does more for repeatable contact than any single position does, and because moving from the ground up is where easy speed comes from.'
+  },
 };
 var VALID_ANGLES = ['down-the-line', 'front-on', 'other'];
 var VALID_STATUS = ['open', 'improving', 'resolved'];
@@ -991,6 +1027,31 @@ function findingsForPrompt(findings) {
     const note = f.note ? ` — ${f.note}` : '';
     const meas = f.measurement ? ` [${f.measurement}]` : '';
     return `${name}${clubs} (${f.assessment}, ${f.confidence}, ${f.status}${since})${meas}${note}`;
+  });
+}
+
+// Structured rows for the dashboard. Deliberately separate from
+// findingsForPrompt: that one serves a model and carries the full technical
+// record, this one serves the golfer reading the page and carries none of it.
+// Returns objects rather than strings so the page can lay out the heading, the
+// evergreen explainer and the per-swing text separately.
+function findingsForDisplay(findings) {
+  return openFindings(findings).map(function (f) {
+    var t = FINDING_TAXONOMY[f.finding];
+    var plain = (f.plain || '').trim();
+    return {
+      key: f.finding,
+      plainName: t ? t.plainName : f.finding,
+      label: t ? t.label : f.finding,
+      explainer: t ? t.explainer : '',
+      plain: plain,
+      clubs: f.clubs || [],
+      // A finding with no plain-language summary renders a visible notice
+      // rather than an empty card -- silent blankness would hide the fact that
+      // a session skipped writing one, which is exactly the kind of quiet gap
+      // this project surfaces instead of swallowing.
+      missingPlain: !plain
+    };
   });
 }
 

@@ -147,12 +147,25 @@ swing," never "n=1." Any of these belong in `note`.
   moment).
 
   It does, however, carry `FINDING_TAXONOMY` and `findingsForPrompt` inside its
-  byte-identical copy of the shared engine block — verified: 6 references. So
-  **re-mirroring `course.html` is a required implementation step, not optional**.
-  Both the taxonomy additions and `findingsForDisplay` land inside
-  `/*ENGINE-START*/…/*ENGINE-END*/`, which `course.html` must continue to match
-  exactly. Mirror it with the established splice script, never by hand-editing,
-  and confirm with `test-course-engine.js`'s parity assertions.
+  copy of the shared engine block, so **re-mirroring `course.html` is a required
+  implementation step, not optional**.
+
+  **Correction (found during implementation):** an earlier draft of this spec
+  called `course.html`'s block a "byte-identical copy." It is not, and acting on
+  that claim deletes working code. The real structure is:
+
+  ```
+  course.html's engine block = range.html's shared block + course-only helpers
+  ```
+
+  `pickReminders` and `ladderRows` live inside the same markers, exist only in
+  `course.html`, and are called by its own dashboard. A wholesale block replace
+  removes them and breaks the on-course page. Mirror by splicing at the
+  `// ── Course-view helpers` banner: refresh everything before it, keep
+  everything from it onward. Also note `course.html` is CRLF and `range.html` is
+  LF, so comparisons must normalise line endings and the write must restore CRLF.
+  Confirm with `test-course-engine.js`, which catches the deletion outright
+  (`ReferenceError: pickReminders is not defined`).
 - `data/findings.json`'s existing `note`, `measurement`, `confidence`,
   `assessment`, `cameraAngle`, and `status` fields are untouched.
 - No new dependencies, no render-time model, no API key.

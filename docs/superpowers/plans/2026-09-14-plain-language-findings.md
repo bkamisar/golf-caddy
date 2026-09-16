@@ -244,37 +244,63 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## Task 3: Mirror the engine block into course.html
 
-`course.html` carries a byte-identical copy of range's shared engine block (verified: it contains `FINDING_TAXONOMY` and `findingsForPrompt`). It displays no findings and gains no UI, but the code must stay identical. **Mirror programmatically — never hand-edit** — because a hand copy silently drifts.
+**Read this before running anything.** The spec described `course.html` as carrying a "byte-identical copy" of range's engine block. That is **wrong**, and a wholesale replace based on it destroys working code. The true structure, verified:
+
+```
+course.html's engine block  =  range.html's shared block  +  ~1.4KB of course-only helpers
+```
+
+Those helpers (`pickReminders`, `ladderRows`, under a `// ── Course-view helpers` banner) exist **only** in `course.html`, live inside the same `/*ENGINE-START*/…/*ENGINE-END*/` markers, and are called by the on-course dashboard at roughly `course.html:1295`. A naive splice deletes them, breaking that page in the browser — `test-course-engine.js` catches it with `ReferenceError: pickReminders is not defined`.
+
+Two further traps: `course.html` is **CRLF** throughout while `range.html` is **LF**, so any comparison must normalise line endings or every line appears to differ; and the splice must restore CRLF on write or the file's endings get mangled.
+
+**Mirror programmatically — never hand-edit.** Splice at the helpers marker so the shared half is refreshed and the course-only half survives.
 
 **Files:**
 - Modify: `course.html`
 
-- [ ] **Step 1: Splice range's engine block into course.html**
+- [ ] **Step 1: Splice, preserving the course-only helpers**
 
 ```bash
 cd "C:/Users/bkami/Desktop/AI Tools/golf-caddy" && node -e "
 const fs = require('fs');
-const range = fs.readFileSync('range.html', 'utf8');
-const course = fs.readFileSync('course.html', 'utf8');
-const block = range.split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0];
+const MARK = '// ── Course-view helpers';
+
+const range = fs.readFileSync('range.html','utf8').replace(/\r\n/g,'\n');
+const course = fs.readFileSync('course.html','utf8').replace(/\r\n/g,'\n');
+
+const sharedBlock = range.split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0];
+const courseBlock = course.split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0];
+
+// Keep everything from the helpers banner onward; refresh everything before it.
+const helpers = courseBlock.slice(courseBlock.indexOf(MARK));
+const rebuilt = sharedBlock + helpers;
+
 const head = course.split('/*ENGINE-START*/')[0];
 const tail = course.split('/*ENGINE-END*/')[1];
-fs.writeFileSync('course.html', head + '/*ENGINE-START*/' + block + '/*ENGINE-END*/' + tail);
-console.log('spliced');
+const out = head + '/*ENGINE-START*/' + rebuilt + '/*ENGINE-END*/' + tail;
+
+fs.writeFileSync('course.html', out.replace(/\n/g,'\r\n'));  // restore CRLF
+console.log('spliced; helpers preserved:', helpers.length, 'chars');
 "
 ```
 
-- [ ] **Step 2: Verify the blocks are now byte-identical**
+- [ ] **Step 2: Verify the shared half matches and the course-only half survived**
 
 ```bash
 cd "C:/Users/bkami/Desktop/AI Tools/golf-caddy" && node -e "
-const fs = require('fs');
-const g = f => fs.readFileSync(f,'utf8').split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0];
-console.log('identical:', g('range.html') === g('course.html'));
+const fs=require('fs');
+const norm = s => s.replace(/\r\n/g,'\n');
+const blk = f => norm(fs.readFileSync(f,'utf8')).split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0];
+const r = blk('range.html'), c = blk('course.html');
+console.log('course block starts with range shared block:', c.startsWith(r));
+console.log('course retains pickReminders:', c.includes('pickReminders'), '| ladderRows:', c.includes('ladderRows'));
+console.log('course has findingsForDisplay:', c.includes('findingsForDisplay'));
+console.log('still all CRLF:', (fs.readFileSync('course.html','utf8').match(/(?<!\r)\n/g)||[]).length === 0);
 "
 ```
 
-Expected: `identical: true`
+Expected: `true` on all four lines. Anything else means stop — do not commit a partially mirrored `course.html`.
 
 - [ ] **Step 3: Run both engine test suites**
 
