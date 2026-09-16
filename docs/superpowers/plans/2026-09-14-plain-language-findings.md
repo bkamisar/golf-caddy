@@ -273,7 +273,15 @@ const sharedBlock = range.split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0
 const courseBlock = course.split('/*ENGINE-START*/')[1].split('/*ENGINE-END*/')[0];
 
 // Keep everything from the helpers banner onward; refresh everything before it.
-const helpers = courseBlock.slice(courseBlock.indexOf(MARK));
+// Guard, not cosmetic: indexOf returns -1 if MARK is ever missing (e.g. the
+// banner gets reworded), and slice(-1) would then silently return just the
+// LAST CHARACTER of the block instead of throwing -- collapsing pickReminders
+// and ladderRows to one stray character with no error anywhere. Fail loudly
+// instead, matching how a missing ENGINE-START/ENGINE-END marker already
+// crashes every script that relies on it.
+const markerIndex = courseBlock.indexOf(MARK);
+if (markerIndex === -1) throw new Error('Course-view helpers banner not found -- did the comment get reworded? Fix MARK before re-running this splice.');
+const helpers = courseBlock.slice(markerIndex);
 const rebuilt = sharedBlock + helpers;
 
 const head = course.split('/*ENGINE-START*/')[0];
