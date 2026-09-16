@@ -343,6 +343,56 @@ the result as "observed in N of M swings" in the finding's free-text
 differently than one seen in 5 of 5, and this is the only place that
 distinction gets captured.
 
+## 8b. Write the `plain` layer — what the golfer actually reads
+
+Every finding carries two text fields with different audiences, and they must
+not be confused:
+
+- `note` — the full technical record. Method, pixel counts, noise floors,
+  frame choices, what could have gone wrong. Feeds the coach prompt and future
+  sessions. **Never shown in the app.**
+- `plain` — 2–5 sentences the golfer reads on `range.html`. **The only findings
+  text the app displays.**
+
+`plain` must do three things:
+
+1. Say what was seen **in this specific swing**, in ordinary language.
+2. Say what is and is not trustworthy, **and why**, in ordinary language —
+   confidence is spoken, never shown as a badge or a number.
+3. Offer a next step **explicitly conditioned** on the finding holding up
+   ("if it shows up again in a second video, the usual work is…"), or say
+   plainly that it is too early to change anything.
+
+**Never assert a fault.** This project carries no population baseline, which is
+why assessments are `neutral`. "If this holds up, the usual work is X" is in
+bounds. "You have early extension and it is costing you distance" is not.
+
+**Banned from `plain`:** pixel counts, noise floors, signal-to-noise ratios
+("15.7x"), drift correction, click precision, frame timestamps, and internal
+function names (`isImprovement`, `toInches`, `correctedDelta`). Write "one
+swing," never "n=1." All of it belongs in `note` instead.
+
+Do not restate what the pattern *is* — `FINDING_TAXONOMY` already carries a
+written-once `explainer` for each finding type, and the app shows it above your
+text. Write only what *this golfer's swing* did.
+
+**Two more rules learned from real mistakes on this project's own findings:**
+
+- **Include every caveat that would change how much the number should be
+  trusted, not just the easiest one to explain.** A real finding here
+  originally mentioned two minor caveats and silently dropped the single most
+  consequential one (a measurement that would have read nearly 3x larger if
+  pinned to the wrong video frame). If `note` names a caveat as the dominant
+  source of uncertainty, `plain` must convey it too — in plain words, not with
+  the technical framing, but the substance must survive the translation.
+- **If a `plain` text suggests a next step, connect it to the finding
+  causally, not just by name.** "The usual work is X" is not enough on its
+  own for a beginner — say why X would address what was actually observed
+  (e.g. not just "hold your posture longer," but "so your body doesn't stand
+  up early and take away the space your arms need to swing through"). A
+  suggestion with no visible mechanism is a cue the golfer can't evaluate or
+  even remember correctly.
+
 ## 9. Write findings to `data/findings.json`
 
 There is no write UI for this (unlike recommendations, which have a form in
