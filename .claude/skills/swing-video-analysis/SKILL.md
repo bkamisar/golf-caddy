@@ -372,6 +372,12 @@ bounds. "You have early extension and it is costing you distance" is not.
 function names (`isImprovement`, `toInches`, `correctedDelta`). Write "one
 swing," never "n=1." All of it belongs in `note` instead.
 
+**This also applies to golf terminology, not just measurement jargon** — the
+user has said outright that he is still learning it. "At address" slipped
+through once; write "in your starting stance" instead. If a term isn't
+self-explanatory from context, it doesn't belong in `plain` even if it's the
+correct golf word for the thing.
+
 Do not restate what the pattern *is* — `FINDING_TAXONOMY` already carries a
 written-once `explainer` for each finding type, and the app shows it above your
 text. Write only what *this golfer's swing* did.
@@ -391,7 +397,13 @@ text. Write only what *this golfer's swing* did.
   (e.g. not just "hold your posture longer," but "so your body doesn't stand
   up early and take away the space your arms need to swing through"). A
   suggestion with no visible mechanism is a cue the golfer can't evaluate or
-  even remember correctly.
+  even remember correctly. **Take that mechanism from the taxonomy's own
+  `explainer`, never invent one fresh** — a different task on this project
+  once wrote a plausible-sounding but factually wrong golf-mechanism claim
+  (that swing plane alone determines curve; it doesn't, clubface angle does)
+  into an explainer, and it took a dedicated review to catch. `explainer` has
+  already been fact-checked once; free-form mechanism prose written under
+  time pressure while logging a finding has not.
 
 ## 9. Write findings to `data/findings.json`
 
@@ -413,8 +425,19 @@ Schema (see `FINDING_TAXONOMY`, `gradeFinding`, `mergeFindings` in
   "cameraAngle": "down-the-line" | "front-on" | "other",
   "firstNoted": "<date>", "lastConfirmed": "<date>",
   "status": "open" | "improving" | "resolved",
+  "plain": "<what the golfer reads — see step 8b>",
   "note": "<free text>" }
 ```
+
+**`plain` is not optional.** Skip it and the golfer sees a visible "no
+plain-language summary was written" notice on the dashboard instead of your
+finding — see step 8b for what belongs in it.
+
+**On a recurring finding** (same `id`, a new video confirming or updating it),
+rewrite `plain` from scratch rather than appending to it — it should always
+read as one coherent statement of where things stand now, not a stitched-
+together history. If the new video changes the picture (confirms it, shows
+improvement, contradicts it), say so in the new `plain` text itself.
 
 There's no structured numeric field, only `measurement` as free text — but
 `isImprovement` needs the PRIOR entry's number to compare against, so
