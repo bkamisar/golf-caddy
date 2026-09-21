@@ -47,7 +47,18 @@ if it's unclear from the images.
   cells, and per-hole marks frequently do not sum cleanly to the round's own
   printed penalty total. Never guess a per-hole stroke count from this row.
   Only the round-level printed total goes in `penalties`; there is no
-  per-hole penalty-stroke field in the schema (an optional `lie` string is
+  per-hole penalty-stroke field in the schema.
+
+  **Working hypothesis (found on the 2026-09-20 capture):** the codes carry
+  fixed weights, not stroke counts — `S` = 0.5, `F` = 0.5, `W` = 1, `D` = 1,
+  `O` = 2, and `2S` = two `S` marks = 1. Adding the weights of a nine's codes
+  reproduces its printed penalty subtotal on every one of the 8 rounds on
+  file. Evidence is uneven: `S`, `O`, `D` are each confirmed by more than one
+  round, `W` by one, `F` by one. So a per-hole sum that fails to match the
+  printed subtotal is now a real signal to re-check the transcription, but it
+  is still not a documented Grint rule — say "appears to" in `unresolved`, and
+  if a new code or an unexplained subtotal turns up, update this rather than
+  forcing it to fit. (An optional `lie` string is
   allowed on a hole entry if a specific code is clearly legible there — see
   hole 11 in the 2026-09-05 entry for precedent — but it doesn't feed any
   rollup).
