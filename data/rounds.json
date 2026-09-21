@@ -1774,6 +1774,128 @@
   "putts": 22,
   "gir": 33,
   "fir": 75,
-  "diff": 34.1
+  "diff": 34.1,
+  "holeDetail": [
+   {
+    "hole": 1,
+    "par": 4,
+    "score": 6,
+    "putts": 3,
+    "firstPuttFt": 50,
+    "gir": false,
+    "girMiss": "miss",
+    "teeClub": "Dr",
+    "fir": true,
+    "driveMiss": null
+   },
+   {
+    "hole": 2,
+    "par": 3,
+    "score": 4,
+    "putts": 3,
+    "firstPuttFt": 40,
+    "gir": true,
+    "girMiss": null,
+    "teeClub": "PW",
+    "fir": null,
+    "driveMiss": null
+   },
+   {
+    "hole": 3,
+    "par": 3,
+    "score": 6,
+    "putts": 3,
+    "firstPuttFt": null,
+    "gir": false,
+    "girMiss": "miss",
+    "teeClub": "4H",
+    "fir": null,
+    "driveMiss": null
+   },
+   {
+    "hole": 4,
+    "par": 3,
+    "score": 4,
+    "putts": 2,
+    "firstPuttFt": 40,
+    "gir": false,
+    "girMiss": "miss",
+    "teeClub": "4H",
+    "fir": null,
+    "driveMiss": null
+   },
+   {
+    "hole": 5,
+    "par": 4,
+    "score": 5,
+    "putts": 2,
+    "firstPuttFt": null,
+    "gir": false,
+    "girMiss": "miss",
+    "teeClub": "Dr",
+    "fir": true,
+    "driveMiss": null
+   },
+   {
+    "hole": 6,
+    "par": 4,
+    "score": 5,
+    "putts": 2,
+    "firstPuttFt": 30,
+    "gir": false,
+    "girMiss": "miss",
+    "teeClub": "Dr",
+    "fir": true,
+    "driveMiss": null
+   },
+   {
+    "hole": 7,
+    "par": 3,
+    "score": 3,
+    "putts": 2,
+    "firstPuttFt": 20,
+    "gir": true,
+    "girMiss": null,
+    "teeClub": "4H",
+    "fir": null,
+    "driveMiss": null
+   },
+   {
+    "hole": 8,
+    "par": 3,
+    "score": 5,
+    "putts": 2,
+    "firstPuttFt": 20,
+    "gir": false,
+    "girMiss": "severe",
+    "teeClub": "4H",
+    "fir": null,
+    "driveMiss": null
+   },
+   {
+    "hole": 9,
+    "par": 4,
+    "score": 5,
+    "putts": 3,
+    "firstPuttFt": 30,
+    "gir": true,
+    "girMiss": null,
+    "teeClub": "Dr",
+    "fir": false,
+    "driveMiss": "severe"
+   }
+  ]
+ },
+ {
+  "date": "2026-09-20",
+  "course": "Oak Creek Golf Club",
+  "rating": 68.4,
+  "slope": 121,
+  "score": 101,
+  "holes": 18,
+  "putts": 38,
+  "gir": 6,
+  "fir": 69,
+  "diff": 30.4
  }
 ]
