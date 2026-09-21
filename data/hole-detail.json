@@ -296,5 +296,55 @@
       { "hole": 8, "par": 3, "score": 5, "putts": 2, "firstPuttFt": 20,   "gir": false, "girMiss": "severe","teeClub": "4H", "fir": null,  "driveMiss": null },
       { "hole": 9, "par": 4, "score": 5, "putts": 3, "firstPuttFt": 30,   "gir": true,  "girMiss": null,   "teeClub": "Dr", "fir": false, "driveMiss": "severe" }
     ]
+  },
+  {
+    "date": "2026-09-20",
+    "course": "Oak Creek Golf Club",
+    "rating": 68.4,
+    "slope": 121,
+    "score": 101,
+    "putts": 38,
+    "girPct": 6,
+    "firPct": 69,
+    "penalties": 2.5,
+    "verified": {
+      "parSum": "36 out / 36 in / 72 total -- matches card",
+      "scoreSum": "54 out / 47 in / 101 total -- matches card",
+      "puttsSum": "21 out / 17 in / 38 total -- matches card",
+      "girCount": "1 of 18 (hole 4 only) = 6% total; 11% out, 0% in -- matches card",
+      "firCount": "5 of 7 out + 4 of 6 in = 9 of 13 non-par-3 fairways = 69% -- matches card, and each nine matches its own printed 5/7 and 4/6",
+      "penaltiesSum": "front S (hole 7) + W (hole 8) + F (hole 9) = 0.5 + 1 + 0.5 = 2.0, matches printed OUT 2; back S (hole 16) = 0.5, matches printed IN 0.5; total 2.5 matches card. See unresolved for how solid each code weight is.",
+      "roundLevelRecord": "No 2026-09-20 entry existed in data/rounds.json when this was captured, so the round-level cross-check could not be run. Card totals above are the only reconciliation."
+    },
+    "unresolved": [
+      "The round-level record for this date was not yet in data/rounds.json at capture time, so this hole-level entry will not join to anything until it is pasted into index.html and saved. Course string must then read exactly 'Oak Creek Golf Club' (it matches the 2026-07-19 entry on file).",
+      "Grint's PENALTIES codes appear to carry fixed weights rather than being plain stroke counts: S (greenside bunker) = 0.5, F (fairway bunker) = 0.5, W (penalty area) = 1, D (drop shot) = 1, O (out of bounds) = 2, and '2S' = two S marks = 1. That reconciles every printed penalty total across all 8 rounds on file, including this one. Strength of evidence differs by code: S, O and D are each confirmed by more than one round; W rests on one round (2026-07-05, W + O = 3) and F on this round alone (S + W + F = 2.0). Treat as a strongly supported working hypothesis, not a documented Grint rule. No per-hole penalty-weight field exists in the schema, so only the round-level total and the bunker `lie` codes are stored; hole 8's W is recorded here in prose only.",
+      "Hole 7's DISTANCE (ft) cell reads '50+', not an exact number. Recorded as firstPuttFt:50 (a floor, not the true value), consistent with prior captures.",
+      "DISTANCE (ft) was blank on holes 3, 4, 5, 13, 15 and 16. Recorded as firstPuttFt:null rather than guessed.",
+      "Hole 16's tee shot shows a plain X (generic fairway miss with no direction). Recorded as driveMiss:'miss' rather than inventing a direction.",
+      "Holes 6, 8, 11, 13 and 15 are par 3s: their DRIVING cell is blank, the tee club is recorded in teeClub, and any miss icon is read as the GIR miss (hole 6, 11, 13 = short arrow; hole 15 = severe chevron), per the confirmed par-3 rule.",
+      "Hole 8 shows a score of 4 with 1 putt on a par 3 with a W (penalty area) mark: tee shot, penalty stroke, a third shot, then a holed putt from a recorded 30 ft. Internally consistent, but the exact sequence is inferred, not shown on the card."
+    ],
+    "holes": [
+      { "hole": 1,  "par": 4, "score": 7, "putts": 3, "firstPuttFt": 40,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 2,  "par": 4, "score": 6, "putts": 2, "firstPuttFt": 40,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 3,  "par": 4, "score": 7, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": false, "driveMiss": "severe" },
+      { "hole": 4,  "par": 4, "score": 5, "putts": 3, "firstPuttFt": null, "gir": true,  "girMiss": null,     "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 5,  "par": 5, "score": 7, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 6,  "par": 3, "score": 5, "putts": 3, "firstPuttFt": 40,   "gir": false, "girMiss": "short",  "teeClub": "5H", "fir": null,  "driveMiss": null },
+      { "hole": 7,  "par": 5, "score": 8, "putts": 3, "firstPuttFt": 50,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null, "lie": "S" },
+      { "hole": 8,  "par": 3, "score": 4, "putts": 1, "firstPuttFt": 30,   "gir": false, "girMiss": "miss",   "teeClub": "7i", "fir": null,  "driveMiss": null },
+      { "hole": 9,  "par": 4, "score": 5, "putts": 2, "firstPuttFt": 40,   "gir": false, "girMiss": "miss",   "teeClub": "4H", "fir": false, "driveMiss": "short", "lie": "F" },
+
+      { "hole": 10, "par": 4, "score": 5, "putts": 2, "firstPuttFt": 40,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 11, "par": 3, "score": 4, "putts": 2, "firstPuttFt": 30,   "gir": false, "girMiss": "short",  "teeClub": "7i", "fir": null,  "driveMiss": null },
+      { "hole": 12, "par": 5, "score": 5, "putts": 1, "firstPuttFt": 30,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 13, "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "short",  "teeClub": "5H", "fir": null,  "driveMiss": null },
+      { "hole": 14, "par": 5, "score": 6, "putts": 2, "firstPuttFt": 40,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": false, "driveMiss": "severe" },
+      { "hole": 15, "par": 3, "score": 6, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "severe", "teeClub": "8i", "fir": null,  "driveMiss": null },
+      { "hole": 16, "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": false, "driveMiss": "miss", "lie": "S" },
+      { "hole": 17, "par": 5, "score": 6, "putts": 1, "firstPuttFt": 30,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 18, "par": 4, "score": 5, "putts": 2, "firstPuttFt": 30,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null }
+    ]
   }
 ]
