@@ -1897,5 +1897,18 @@
   "gir": 6,
   "fir": 69,
   "diff": 30.4
+ },
+ {
+  "date": "2026-10-03",
+  "course": "Paint Branch Golf",
+  "rating": 29.4,
+  "slope": 85,
+  "score": 39,
+  "holes": 9,
+  "putts": 19,
+  "gir": 33,
+  "fir": 100,
+  "diff": 28.7,
+  "diffEstimated": true
  }
 ]
