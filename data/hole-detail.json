@@ -346,5 +346,45 @@
       { "hole": 17, "par": 5, "score": 6, "putts": 1, "firstPuttFt": 30,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null },
       { "hole": 18, "par": 4, "score": 5, "putts": 2, "firstPuttFt": 30,   "gir": false, "girMiss": "miss",   "teeClub": "Dr", "fir": true,  "driveMiss": null }
     ]
+  },
+  {
+    "date": "2026-10-03",
+    "course": "Paint Branch Golf",
+    "rating": 29.4,
+    "slope": 85,
+    "score": 39,
+    "putts": 19,
+    "girPct": 33,
+    "firPct": 100,
+    "penalties": 2,
+    "verified": {
+      "parSum": "31 out -- matches card's OUT/TOTAL",
+      "scoreSum": "39 out -- matches card's OUT/TOTAL. Independent check: every score's colored box on the card (bogey / par / double / birdie) agrees with that hole's par.",
+      "puttsSum": "19 out -- matches card's OUT/TOTAL",
+      "girCount": "3 of 9 (holes 2, 4, 6) = 33% -- matches card",
+      "firCount": "4 of 4 non-par-3 fairways (holes 1, 5, 6, 9) = 100% -- matches card's printed 4/4",
+      "penaltiesSum": "One O (out of bounds) mark on hole 5; card prints 2 for both OUT and TOTAL. O = 2 is now confirmed in three rounds, and in two of them (this one and 2026-09-12) O is the only code in the nine, so it is the best-supported weight in the penalty-weight hypothesis recorded in the scorecard-capture skill.",
+      "roundLevelRecord": "The round-level entry in data/rounds.json was written from this same card in the same session, not pasted separately from Grint, so agreement between the two records is by construction and is NOT an independent check. The card's own printed subtotals above are the independent reconciliation. That entry's differential (28.7) is a reconstruction, not Grint's number -- see the commit message."
+    },
+    "unresolved": [
+      "Hole 5 shows DRIVING = fairway hit, CLUB blank, and an O (out of bounds) in PENALTIES. A fairway hit and an out-of-bounds cannot both come from one tee shot. The scoring is consistent with an out-of-bounds first tee shot followed by a second tee shot that found the fairway: 1 (OB) + 1 (penalty) + re-tee + approach + 2 putts = 6, which is the recorded score. That sequence is inferred, not shown on the card. Recorded as fir:true and teeClub:null, exactly as displayed.",
+      "Hole 9 shows DRIVING = fairway hit but CLUB blank. Recorded as fir:true and teeClub:null.",
+      "Hole 6 is a par 4 scored 3 with 2 putts and a green in regulation, which leaves exactly one non-putt stroke: by arithmetic the tee shot (a 4H) reached the green. Inferred from the numbers, not shown on the card.",
+      "Hole 7's DISTANCE (ft) reads '50' with no trailing '+'. Earlier captures showed '50+' for the display cap, and this column sits against the right edge of the screenshot, so a '+' may have been clipped. Recorded as firstPuttFt:50, which is a floor either way.",
+      "DISTANCE (ft) was blank on holes 1, 2, 3, 5, 8 and 9. Recorded as firstPuttFt:null rather than guessed.",
+      "Holes 2, 3, 4, 7 and 8 are par 3s: their DRIVING cell is blank, the tee club is recorded in teeClub, and hole 3's short arrow is read as the GIR miss, per the confirmed par-3 rule. Holes 7 and 8 show a plain X, recorded as girMiss:'miss'.",
+      "Rating and slope on this card (29.4 / 85) differ from the 2026-09-12 round at the same course (29.2 / 83) with an identical par layout, which suggests a different set of tees. Recorded from this card as printed."
+    ],
+    "holes": [
+      { "hole": 1, "par": 4, "score": 5, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "Dr", "fir": true,  "driveMiss": null },
+      { "hole": 2, "par": 3, "score": 3, "putts": 2, "firstPuttFt": null, "gir": true,  "girMiss": null,    "teeClub": "PW", "fir": null,  "driveMiss": null },
+      { "hole": 3, "par": 3, "score": 5, "putts": 3, "firstPuttFt": null, "gir": false, "girMiss": "short", "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 4, "par": 3, "score": 3, "putts": 2, "firstPuttFt": 40,   "gir": true,  "girMiss": null,    "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 5, "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": null, "fir": true,  "driveMiss": null },
+      { "hole": 6, "par": 4, "score": 3, "putts": 2, "firstPuttFt": 40,   "gir": true,  "girMiss": null,    "teeClub": "4H", "fir": true,  "driveMiss": null },
+      { "hole": 7, "par": 3, "score": 4, "putts": 2, "firstPuttFt": 50,   "gir": false, "girMiss": "miss",  "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 8, "par": 3, "score": 4, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": "4H", "fir": null,  "driveMiss": null },
+      { "hole": 9, "par": 4, "score": 6, "putts": 2, "firstPuttFt": null, "gir": false, "girMiss": "miss",  "teeClub": null, "fir": true,  "driveMiss": null }
+    ]
   }
 ]
