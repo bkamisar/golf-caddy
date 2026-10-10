@@ -1,7 +1,7 @@
 # Combined coach debrief — design
 
 **Date:** 2026-10-09, revised the same day after an independent review
-**Status:** revised; awaiting user review before a plan is written
+**Status:** approved; implemented per `docs/superpowers/plans/2026-10-09-combined-debrief.md`
 
 ## Problem
 
@@ -206,7 +206,9 @@ step.
 2. Write the debrief.
 3. Propose one priority, with its test, window, and pass odds.
 4. Get the user's confirmation.
-5. Edit `data/recommendations.json` surgically (never reserialise it).
+5. Write `data/recommendations.json` with `tools/write-priority.js`, in the
+   pages' own save format (`JSON.stringify(recs, null, 1)`), so unchanged
+   records keep identical bytes.
 6. Commit locally and remind the user to push.
 
 The existing Copy-prompt buttons stay unchanged as a fallback when no session is

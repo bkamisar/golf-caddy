@@ -226,6 +226,18 @@ between them, one at a time.
 Each coach debrief opens with a continuity check, because the app remembers
 what it told you last time.
 
+**Preferred: the combined debrief in Claude Code.** Ask for a coach debrief in
+a Claude Code session in this repo. It reads rounds, hole detail, launch-monitor
+sessions and swing findings together (`node tools/debrief-facts.js`), ranks
+problems by what they cost on the course, and proposes one priority with a
+course test — for example "putts at or below 39.5 per 18 over the next 54
+holes" — and how likely that is to pass by luck versus with real improvement.
+Once you confirm, it saves the priority to `data/recommendations.json` itself
+and commits; you push. After each logged round the scorecard capture prints
+how the test is going.
+
+**Fallback: the Copy-prompt buttons.**
+
 1. Copy the debrief prompt into Claude and read what comes back.
 2. It ends with one priority and a numeric success criterion. Log both under
    **Log a practice priority**.
@@ -233,8 +245,9 @@ what it told you last time.
 4. The next debrief opens by asking whether you met that criterion. Record the
    answer when you log the next priority — one form does both.
 
-A priority stays open until you close it, and only one can be open per source
-at a time. That is deliberate: the continuity check has to be answerable, and
+Only one priority should be open at a time. The combined debrief and the range
+page enforce that across every source; the rounds page checks only round
+priorities. That is deliberate: the continuity check has to be answerable, and
 three simultaneous open priorities make it a guess.
 
 ### Swing findings

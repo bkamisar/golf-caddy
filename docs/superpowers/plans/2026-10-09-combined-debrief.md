@@ -12,7 +12,7 @@
 
 ## Status at hand-off
 
-Tasks 1–6 were written and run against the real data while this plan was being drafted, to make sure the plan's code works. They are committed (one commit, "Add combined-debrief facts and priority scripts"). **They have not been independently reviewed.** The code lives in the files named under each task and is not repeated here. Tasks 7–9 are not started.
+Tasks 1–6 were written and run against the real data while this plan was being drafted; Tasks 7–8 followed in the same session (user chose to finish on Opus). They are committed (one commit, "Add combined-debrief facts and priority scripts"). **They have not been independently reviewed.** The code lives in the files named under each task and is not repeated here. Tasks 7–9 are not started.
 
 ## Global Constraints
 
@@ -167,7 +167,7 @@ Errors exit 1 with the message. Writes `JSON.stringify(recs, null, 1) + '\n'`.
 
 ---
 
-### Task 7: `range.html` shows and guards course-tested priorities
+### Task 7: `range.html` shows and guards course-tested priorities — DONE
 
 **Files:** Modify `range.html` page code only, outside the engine block (lines 170–1276):
 - line 1361 in `doAddRec`
@@ -179,25 +179,25 @@ Line 1495 (`const openRec = …` for the range Copy-prompt) is **left unchanged*
 
 **Interfaces:** consumes the existing page functions `lastRecommendation`, `closePending` and `loadRecs`, and the localStorage key `golfcaddy_recs`. Produces no new names.
 
-- [ ] **Step 1: Confirm the line numbers.**
+- [x] **Step 1: Confirm the line numbers.**
 
 Run: `grep -n "\['range', 'video'\]\|r.source !== 'round'" range.html`
 
 Expected: exactly lines 1361, 1377, 1495, 1503 and 1517. If they have moved, use the matches; the text is what matters.
 
-- [ ] **Step 2: Edit the two identical `pending` lines (1361 and 1503).** Use Edit with `replace_all: true`.
+- [x] **Step 2: Edit the two identical `pending` lines (1361 and 1503).** Use Edit with `replace_all: true`.
 
 Old: `  const pending = lastRecommendation(recs, ['range', 'video']);`
 
 New: `  const pending = lastRecommendation(recs, ['range', 'video', 'round']);`
 
-- [ ] **Step 3: Edit line 1377.**
+- [x] **Step 3: Edit line 1377.**
 
 Old: `    recs = closePending(recs, ['range', 'video'], sel.value, null, today);`
 
 New: `    recs = closePending(recs, ['range', 'video', 'round'], sel.value, null, today);`
 
-- [ ] **Step 4: Edit line 1517.**
+- [x] **Step 4: Edit line 1517.**
 
 Old: `  recRows = recs.filter(r => r.source !== 'round').slice().reverse();`
 
@@ -205,13 +205,13 @@ New: `  recRows = recs.slice().reverse();`
 
 `doDeleteRec(i)` looks rows up by index in `recRows` and deletes by `recKey`, so round rows in the table delete correctly.
 
-- [ ] **Step 5: Run all suites.**
+- [x] **Step 5: Run all suites.**
 
 Run: `node test-engine.js | tail -1 && node test-range-engine.js | tail -1 && node test-course-engine.js | tail -1 && node test-debrief-facts.js | tail -1`
 
 Expected: four lines of `ALL PASS`. `test-course-engine.js` proves the engine block, which is mirrored into `course.html`, is untouched.
 
-- [ ] **Step 6: Verify in the browser.** Start the preview with `preview_start {name: "golf-caddy-http"}` and navigate to `http://localhost:8940/range.html`. Then run in the page:
+- [x] **Step 6: Verify in the browser.** Start the preview with `preview_start {name: "golf-caddy-http"}` and navigate to `http://localhost:8940/range.html`. Then run in the page:
 
 ```js
 localStorage.setItem('golfcaddy_recs', JSON.stringify([{date:'2026-10-01',source:'round',priority:'TEST lag ladder',criterion:'TEST putts <= 39.5 per 18 over 54 holes',outcome:'pending',outcomeNote:null,outcomeDate:null}]));
@@ -227,16 +227,16 @@ Then:
 
 Take a screenshot as proof.
 
-- [ ] **Step 7: Clean up.** Run `localStorage.removeItem('golfcaddy_recs'); location.reload();` and confirm the box shows no open priority. Stop the preview.
+- [x] **Step 7: Clean up.** Run `localStorage.removeItem('golfcaddy_recs'); location.reload();` and confirm the box shows no open priority. Stop the preview.
 
-- [ ] **Step 8: Commit.**
+- [x] **Step 8: Commit.**
 
 ```bash
 git add range.html
 git commit -m "Show and guard course-tested priorities on the range page" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-### Task 8: Skills, README, and spec amendment
+### Task 8: Skills, README, and spec amendment — DONE
 
 **Files:**
 - Create: `.claude/skills/coach-debrief/SKILL.md`
@@ -246,7 +246,7 @@ git commit -m "Show and guard course-tested priorities on the range page" -m "Co
 
 **Interfaces:** consumes the commands from Tasks 5 and 6. There is no code.
 
-- [ ] **Step 1: Create `.claude/skills/coach-debrief/SKILL.md`** with exactly this content:
+- [x] **Step 1: Create `.claude/skills/coach-debrief/SKILL.md`** with exactly this content:
 
 ````markdown
 ---
@@ -329,7 +329,7 @@ The pages' Copy-prompt buttons still work as a fallback when no Claude Code
 session is available.
 ````
 
-- [ ] **Step 2: Add the progress step to the scorecard skill.** In `.claude/skills/grint-scorecard-capture/SKILL.md`, replace the "After writing the entry" list with:
+- [x] **Step 2: Add the progress step to the scorecard skill.** In `.claude/skills/grint-scorecard-capture/SKILL.md`, replace the "After writing the entry" list with:
 
 ```markdown
 1. Run `node test-engine.js` from the repo root and confirm `ALL PASS`.
@@ -343,7 +343,7 @@ session is available.
    whole update — don't run a full debrief unasked.
 ```
 
-- [ ] **Step 3: Update the README practice loop.** Replace the "The practice loop" section body, up to but not including `### Swing findings`, with:
+- [x] **Step 3: Update the README practice loop.** Replace the "The practice loop" section body, up to but not including `### Swing findings`, with:
 
 ```markdown
 Each coach debrief opens with a continuity check, because the app remembers
@@ -374,17 +374,17 @@ priorities. That is deliberate: the continuity check has to be answerable, and
 three simultaneous open priorities make it a guess.
 ```
 
-- [ ] **Step 4: Amend the spec.** In `docs/superpowers/specs/2026-10-09-combined-debrief-design.md`:
+- [x] **Step 4: Amend the spec.** In `docs/superpowers/specs/2026-10-09-combined-debrief-design.md`:
   - Replace the line `5. Edit \`data/recommendations.json\` surgically (never reserialise it).` with `5. Write \`data/recommendations.json\` with \`tools/write-priority.js\`, in the pages' own save format (\`JSON.stringify(recs, null, 1)\`), so unchanged records keep identical bytes.`
   - Change the `**Status:**` line to `**Status:** approved; implemented per docs/superpowers/plans/2026-10-09-combined-debrief.md`.
 
-- [ ] **Step 5: Check the skill commands work as written.**
+- [x] **Step 5: Check the skill commands work as written.**
 
 Run: `node tools/debrief-facts.js --progress && node tools/debrief-facts.js --propose putts 4 && node tools/write-priority.js --priority "check" --metric putts --improvement 4 --dry-run`
 
 Expected: the progress line, the proposal sentence plus a JSON line, and a dry-run record. `git status` shows `data/recommendations.json` unchanged.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add .claude/skills/coach-debrief/SKILL.md .claude/skills/grint-scorecard-capture/SKILL.md README.md docs/superpowers/specs/2026-10-09-combined-debrief-design.md

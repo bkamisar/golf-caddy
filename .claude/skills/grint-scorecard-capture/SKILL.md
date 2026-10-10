@@ -144,6 +144,10 @@ checked and that it matched (see existing entries in
    `Add hole-level detail for the 2026-09-12 Paint Branch round`. Local
    commit only — this repo's standing rule is no `git push`/`fetch`/`pull`
    from the CLI; the user pushes via GitHub Desktop.
+3. Run `node tools/debrief-facts.js --progress` and show the user the line it
+   prints. If it says the window is complete, or that no priority is open,
+   offer a full debrief (the `coach-debrief` skill). Otherwise the line is the
+   whole update — don't run a full debrief unasked.
 
 ## If a new icon or code shows up
 
