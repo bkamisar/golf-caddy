@@ -12,7 +12,7 @@
 
 ## Status at hand-off
 
-Tasks 1–6 were written and run against the real data while this plan was being drafted; Tasks 7–8 followed in the same session (user chose to finish on Opus). They are committed (one commit, "Add combined-debrief facts and priority scripts"). **They have not been independently reviewed.** The code lives in the files named under each task and is not repeated here. Tasks 7–9 are not started.
+Tasks 1–6 were written and run against the real data while this plan was being drafted; Tasks 7–8 followed in the same session (user chose to finish on Opus). All are committed. **None has been independently reviewed yet.** The code for Tasks 1–6 lives in the files named under each task and is not repeated here. Task 9 (the first real debrief) is next.
 
 ## Global Constraints
 
