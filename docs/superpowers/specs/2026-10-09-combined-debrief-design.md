@@ -1,207 +1,292 @@
 # Combined coach debrief — design
 
-**Date:** 2026-10-09
-**Status:** direction approved by the user; awaiting spec review before a plan is written
+**Date:** 2026-10-09, revised the same day after an independent review
+**Status:** revised; awaiting user review before a plan is written
 
 ## Problem
 
-Two things are wrong with how debriefs work today.
+**1. Each debrief sees half the evidence.** `range.html` builds its prompt from
+launch-monitor data and swing findings only; `index.html` from rounds and
+hole-level data only. Verified: neither prompt contains the other's data.
 
-**1. Each debrief sees half the evidence.** `range.html` builds a prompt from
-launch-monitor data and swing findings only. `index.html` builds one from rounds
-and hole-level data only. Verified: neither prompt contains the other's data. That
-produced a confident wrong answer. The range debrief made driver side-to-side
-spread the one priority and called it real. The other evidence disagrees:
+The range debrief therefore made driver side-to-side spread the one priority. The
+full evidence says that was the wrong call, but for a different reason than first
+assumed:
 
-| Source | Driver side-to-side spread | Sample |
+| Source | What it shows | Sample |
 |---|---|---|
-| Toptracer, 2026-09-11 | about 64 yd | 14 shots |
-| Trackman, 2026-08-22 | about 17 yd | 8 shots |
-| On the course | fairway hit 68% | 71 tee shots, 9 rounds |
+| Toptracer, 2026-09-11 | spread about 64 yd, split into a left group and a right group, median 12 yd left | 14 shots |
+| Trackman, 2026-08-22 | tight (about 17 yd) but 7 of 8 right, median about 28 yd right | 8 shots |
+| Course | 68% fairways; driver misses with a side recorded: 4 of 4 right (5 of 6 across all tee clubs) | 71 driver tee shots, 9 rounds |
 
-A 64-yard spread is incompatible with a normal fairway rate. The priority was most
-likely an artifact of one instrument or one session.
+Trackman and the course agree on a steady miss right; the Toptracer session is the
+odd one out. Toptracer measures side from the bay's centre line, so changing
+targets alone could produce its split. The driver was the wrong priority mainly
+because **it is the smaller lever**: a missed driver fairway costs about 0.65
+strokes against a hit (2.04 vs 1.40 over par), roughly 1.9 strokes per 18, while
+putting runs about 8.5 putts per round above expectation. A debrief that saw both
+domains would have seen that.
 
-**2. The debrief cannot save its own result.** It happens in a separate Claude
-conversation with no access to the repo. The priority only reaches the website if
-the user remembers to log it by hand, and they forget.
+**2. The debrief cannot save its own result.** It runs in a separate Claude
+conversation with no access to the repo. Logging on the page writes to browser
+storage, then needs a download, a file replacement, a commit and a push. That chain
+is why `data/recommendations.json` is still empty.
 
-**Goal:** one debrief, anchored in the evidence that best reflects scoring, that
-saves its own priority and checks the previous one.
+**Goal:** one debrief that ranks problems by what they cost on the course, says
+honestly where the evidence agrees and disagrees, and saves and later checks its
+own priority with no manual steps.
 
 ## Constraints
 
-- **No shot-level course data.** Grint offers no practical export, so the design
-  must work from scorecards alone. Anything richer is a bonus, never a dependency.
-- Course data coverage today (139 captured holes): direction recorded on 22% of
-  green misses (26/120) and 66% of fairway misses (23/35); first-putt distance on
-  19% of holes (27/139); tee club on 80% (111/139). There is no approach club,
-  approach distance, or hole yardage field.
-- Existing project rules stay: no API calls or keys from the app, no population
-  baselines, instruments never pooled, outcomes never silently inferred.
+- **No shot-level course data.** Grint has no practical export. The design works
+  from scorecards; anything richer is a bonus, never a dependency.
+- **Putts are counted on the green only** (confirmed by the user), so putting
+  figures are genuine putting, not putts from the fringe.
+- **Course data coverage** (139 captured holes):
+  - Left or right actually recorded on 6 of 35 fairway misses and 1 of 120 green
+    misses. Any label at all (including short, long, severe) on 23 of 35 and
+    26 of 120.
+  - First-putt distance on 27 of 139 holes (19%), possibly logged selectively.
+  - Tee club on 111 of 139.
+  - No approach club, approach distance, or hole yardage field.
+- **Existing project rules stay:** no API calls or keys from the app; no
+  population baselines, except the bogey-golfer putting expectation (2.15 putts on
+  a green hit, 1.95 after a miss) the round analyzer already uses; instruments
+  never pooled; outcomes never silently inferred.
 
 ## Evidence rules
 
-The course decides *what* the problem is. The range and video can only help
-explain *why*.
-
-| Tier | Source | Role |
+| Tier | Source | Notes |
 |---|---|---|
-| A | Course outcomes: `rounds.json` (33 eighteen-hole rounds), `hole-detail.json` (9 rounds) | Defines the problem and the priority |
-| B | Range sessions, one instrument at a time | Diagnostic. Describes what the golfer can do on a mat with known yardages, no hazards, a flat lie |
-| C | Video findings | Mechanism. Usually a single swing, so context only |
+| A | `rounds.json`: 33 eighteen-hole rounds | Not self-selected. Preferred for anything it can answer |
+| A | `hole-detail.json`: 9 rounds | Self-selected (the user chose which rounds to capture, including some deliberately bad ones) |
+| B | Range sessions, one instrument at a time | Mat, known yardage, no hazards, flat lie; instrument-specific |
+| C | Video findings | Usually a single swing; context, never a cause |
 
-1. **A priority must point to a cost on the course.** Range or video evidence can
-   support or contradict one. It can never originate one.
-2. **The course wins a disagreement.** The conflicting range figure is flagged for
-   recalibration, never averaged in.
-3. **Every figure carries its sample size and how much was actually recorded.**
-   Unrecorded is unknown, never counted as a miss.
-4. **Instruments are never pooled.** Range numbers compare within one instrument.
-5. **Sampling bias is disclosed.** The user chooses which rounds get hole-level
-   capture, including some deliberately bad ones, so hole-level rates are weaker
-   evidence about a typical round than their precision suggests.
+1. **Rank problems by course cost wherever the course can measure them.**
+2. **A range-originated priority is allowed only where the course data
+   structurally cannot see the problem**, such as wedge distance gaps (there is no
+   approach data). It must be labelled range-originated and name a course outcome
+   to watch.
+3. **Report disagreement; don't settle it by fiat.** Neither source is presumed
+   correct. Course data is self-recorded and coarse; range data is mat-based and
+   instrument-specific. The debrief states which evidence agrees with which.
+4. **Every figure carries its sample size and coverage.** Unrecorded is unknown,
+   never counted as a miss.
+5. **Instruments are never pooled.**
 6. **"Not enough data" is a valid answer for any section.**
 
-## The stroke ledger
+## Where strokes go
 
-Every hole decomposes exactly, anchored only to the two-putt rule:
+An earlier draft opened with an exact ledger splitting strokes over par into
+"getting to the green" and "putting." It is arithmetically correct but
+uninformative: it is anchored to regulation, so a high handicapper lands at about
+80% "before the green" almost by construction, and stating putting as a 20% share
+hid how large it is per round. It is replaced by comparisons within the golfer's
+own data, reported per 18 holes. Categories overlap and are **never summed**.
 
-```
-strokes over par = (score - putts - (par - 2)) + (putts - 2)
-                   \_______ getting to the green _______/   \_ putting _/
-```
+| Comparison | Source | Current value |
+|---|---|---|
+| Putts above expectation, given greens hit | `rounds.json`, 28 rounds with putts and GIR | about 8.5 per round; above expectation in 28 of 28 rounds |
+| Putts per round | `rounds.json`, 33 rounds | 44.3 (43.8 since 2025) |
+| 3-putt holes | `hole-detail.json` | 53 of 139 holes, about 6.9 per 18 |
+| Missed driver fairway, extra cost | `hole-detail.json`, 71 drives | about 0.65 strokes per miss, about 1.9 per 18 |
+| Double bogey or worse | `hole-detail.json` | 71 of 139 holes; 103 of 227 over-par strokes are beyond bogey on those holes |
+| Par-3 greens hit | `hole-detail.json` | 6 of 44 |
 
-Current result over 139 holes: **227 strokes over par = 182 getting to the green
-(80%) + 45 putting (20%).** The split is consistent per round (before-the-green
-ranges 67% to 93%). It needs no comparison to other golfers.
+**Distance versus stroke, within putting.** Of 27 recorded first putts, only 2 were
+inside 25 ft. After a missed green the median first putt is 40 ft (21 holes), and
+from beyond 25 ft the 3-putt rate is 28% (25 holes). That suggests a large part of
+the putting excess is long first putts: chips and approaches leaving 40-footers,
+then lag putting. With distance on only 19% of holes, possibly logged selectively,
+the debrief must call this suggestive. The most useful data request, and one
+fully within the user's control, is **entering first-putt distance on every hole**.
 
-**Limit, to be stated in every debrief:** "getting to the green" mixes tee shots,
-approaches, recoveries, chips and penalties, and the current data cannot split it
-further. The debrief must say so rather than imply a finer attribution.
-
-## Cross-links that today's data supports
+## Cross-links today's data supports
 
 Links are allowed only where both data sets measure the same thing.
 
-1. **Driver:** range side-to-side spread against on-course driver fairway rate
-   (n = 71 tee shots).
-2. **Par-3 tee shots:** the club used (44 holes: 7i x10, 4H x9, PW x7, 8i x4,
-   9i x3, 5H x3, 8 unrecorded) against green hit/miss, against that club's range
-   consistency. Per-club samples are small and must be flagged as such. This is the
-   closest available substitute for approach data, since a par-3 tee shot is an
-   approach shot with a known club.
-3. **Putting:** the existing 3-putt-by-first-putt-distance tier, with its
+1. **Driver.** Each instrument's side median and spread, reported separately,
+   against course fairway rate and recorded miss sides.
+2. **Par-3 tee shots.** The club used (44 holes: 7i x10, 4H x9, PW x7, 8i x4,
+   9i x3, 5H x3, 8 unrecorded) against green hit or miss, against that club's range
+   consistency. Per-club samples are small and flagged.
+3. **Putting.** The existing 3-putt-by-first-putt-distance tier, with its
    10-hole-per-bucket minimum.
 
 **Not allowed:** treating a range carry as an on-course yardage; blaming a course
-miss on a single-swing video finding; any average across instruments.
+outcome on a single-swing video finding; any average across instruments.
 
 ## Priority design
 
-- **One open priority overall**, stored with a new source value `overall`.
-  Existing fields are unchanged:
-  `{date, source: 'overall', priority, criterion, outcome, outcomeNote, outcomeDate}`.
-- **The criterion is a course test with an explicit window**, not a range number.
-  Example: "at least 3 of the next 15 par-3 holes with hole detail are greens hit."
-  The drill is the means. The course result is the test. Only rounds dated after the
-  priority count.
-- **Checkable by name.** The facts script exposes a small set of named course
-  metrics over a date window: par-3 green rate, driver fairway rate, 3-putt rate,
-  blow-up rate (double bogey or worse), and before-the-green strokes per hole.
-  Criteria should be written in those terms. A criterion outside the set is
-  allowed but is judged by the user.
-- **Closing.** The debrief computes the metric, proposes met / not-met /
-  insufficient-data with the evidence, and the **user confirms**. It is
-  `insufficient-data` until the window has enough exposure. Outcomes are never
-  silently inferred.
-- **One open at a time.** Writing the new priority closes any other open priority
-  (none exist today: `recommendations.json` is empty).
-- **Same-day collision.** `recKey` is `date|source`, so a close and a new write for
-  the same source on the same day would overwrite. If an open `overall` record is
-  dated today, update it in place.
+- **Stored with the existing source `'round'`.** The code already notes that
+  putting drills "are assessed by round data," and a course-tested priority is
+  exactly that. No new source value.
+- **Criteria use measures with many chances every round:**
+  - putts per round (in every Grint summary, so it needs no hole detail);
+  - putts above expectation given greens hit;
+  - 3-putt holes per 18 (hole detail);
+  - double-bogey-or-worse holes per 18 (hole detail).
 
-### Page changes this requires
+  These are computed per hole, so 9- and 13-hole rounds count, and the window is
+  measured in holes (for example, the next 54).
+- **The pass threshold comes from the golfer's own recent spread,** chosen so the
+  chance of passing with no real change is about 10% or less. The facts script
+  computes the threshold and reports both the no-change pass rate and the pass
+  rate for a stated improvement, in plain words. With current data (last 10 rounds:
+  mean 42.6 putts, SD 4.0), "average 39 putts or fewer over the next 3 rounds"
+  passes 5% of the time with no change and 61% with a real 4-putt improvement.
 
-The pages filter priorities by hardcoded source lists, so an `overall` priority is
-invisible to them until each is updated (verified: `lastRecommendation` with
-`['range','video']` does not return an `overall` record).
+  Rejected, because they are close to coin flips:
 
-| File | Lines (as of this spec) | Change |
+  | Test | Passes with no change |
+  |---|---|
+  | ≥3 par-3 greens in the next 15 | 34% |
+  | Beat recent median in 2 of the next 3 rounds | 50% |
+- **Running tally.** After every logged round, the scorecard skill prints the open
+  priority's progress, so feedback arrives before the window closes.
+- **Closing.** When the window completes, the debrief proposes met, not-met or
+  insufficient-data with the evidence, and **the user confirms**. Outcomes are
+  never silently inferred.
+- **One open priority at a time.** Writing a new priority closes any open one.
+  (There are none today.)
+- **Same-day collision.** `recKey` is `date|source`. If an open `'round'` record is
+  dated today, update it in place rather than writing a colliding second record.
+
+### Page changes
+
+Only `range.html` changes, and all of these lines sit outside its engine block
+(lines 170 to 1276), so `course.html` needs no re-mirror. `index.html` already
+handles `'round'`. `REC_SOURCES` stays untouched: it is declared in all three files
+and never read.
+
+| `range.html` line | Role | Change |
 |---|---|---|
-| `range.html` | 1361, 1377, 1495, 1503 | add `'overall'` to `['range','video']` |
-| `index.html` | 881, 923, 973, 989 | add `'overall'` to `['round']` |
-| both engine blocks | `REC_SOURCES` (1093, 655) | add `'overall'` |
-| `course.html` | engine block | re-mirror from `range.html` using the helpers-marker splice documented in `2026-09-14-plain-language-findings.md` Task 3, never a wholesale replace |
+| 1361 | logging guard: is a priority open? | add `'round'` |
+| 1377 | close the open priority when logging a new one | add `'round'` |
+| 1503 | the form shows the open priority | add `'round'` |
+| 1517 | priority-history table filters out `'round'` | remove that filter |
+| 1495 | range Copy-prompt continuity check | **leave unchanged**: the fallback range prompt has no round data to judge a round criterion |
 
-Effect: the open priority shows on both dashboards, and each page's existing
-close-before-logging guard enforces one open priority.
+Effect: the open priority shows on both dashboards, including at the range where it
+gets practised, and both pages' close-before-logging guards enforce one open
+priority.
 
 ## Delivery
 
 **Skill:** `.claude/skills/coach-debrief/SKILL.md`.
 
-**Facts script:** `tools/debrief-facts.js`. It loads each page's engine block into
-its **own `vm` context**, reads the committed JSON, and prints a facts report: the
-ledger, coverage rates, per-instrument range digests, par-3 outcomes by club, the
-driver cross-check, a findings digest, the open priority, and its criterion
-evaluated. Feasibility is verified: both engines run on the real data in a single
-process with no collisions, which a plain concatenation cannot do (it is a
-`SyntaxError`, because the pages declare some of the same names, notably
-`SOURCES` and `coachPrompt`, differently).
+**Facts script:** `tools/debrief-facts.js`.
+- Loads each page's engine block into its **own `vm` context**. Concatenating
+  them is a `SyntaxError`, because the pages redeclare names such as `p2` and
+  `median` differently, and they define `SOURCES` and `coachPrompt` with different
+  meanings. Top-level `const`/`let` are not properties of the context object, so
+  they are read with `vm.runInContext('NAME', ctx)`.
+- **Reuses existing engine functions** wherever they exist (`threePuttRates`,
+  `chipProximity`, `blowUpHoles`, `puttsByGreenResult`, `overParByParType`,
+  `computeMetrics`, `computeGapping`, and others).
+- **Adds only what is new:** driver hit-versus-miss cost, the putts-above-expectation
+  series, per-instrument driver side statistics, criterion thresholds with their
+  pass probabilities, and criterion evaluation.
 
 **Numbers come from tested code, never from the model's mental arithmetic.** The
 model's job is judgment and wording.
 
-**Procedure:** run the facts script, write the debrief, propose one priority, get
-confirmation, edit `data/recommendations.json` surgically (no reserialising),
-commit locally, and remind the user to push.
+**Cadence.**
+- **Every logged round:** the scorecard skill prints a progress line for the open
+  priority.
+- **Full debrief:** only when the priority's window completes, no priority is open,
+  or the user asks.
 
-**Trigger:** offered at the end of logging a round, when the data is fresh, and
-available on request. The offer is real work, not an assumption: the
-`grint-scorecard-capture` skill's "After writing the entry" section gains one step
-telling the session to offer the debrief once the round is committed. The existing
-"Copy prompt" buttons stay unchanged as a fallback for when no session is
+The `grint-scorecard-capture` skill's "After writing the entry" section gains that
+step.
+
+**Procedure for a full debrief:**
+1. Run the facts script.
+2. Write the debrief.
+3. Propose one priority, with its test, window, and pass odds.
+4. Get the user's confirmation.
+5. Edit `data/recommendations.json` surgically (never reserialise it).
+6. Commit locally and remind the user to push.
+
+The existing Copy-prompt buttons stay unchanged as a fallback when no session is
 available.
 
 ## Debrief structure
 
-1. **Continuity.** The last priority, evaluated against course data.
-2. **What the course says.** The ledger, blow-ups, par-type, putting tiers, each
-   with n and coverage.
-3. **What range and video add, and where they disagree with the course.** A
-   required section, even if the answer is "they agree."
-4. **The biggest lever.** Course-anchored.
-5. **One priority.** The drill, the course test, and the window.
-6. **What this can't tell you.** The data gaps that limit the answer.
+1. **Continuity.** The open priority, evaluated against course data.
+2. **Where strokes go.** The within-player comparisons, each with sample size and
+   coverage.
+3. **What range and video add, and where the evidence agrees or disagrees.**
+   Required, even if the answer is "they agree."
+4. **The biggest lever.**
+5. **One priority.** The drill, the course test, the window, and in plain words how
+   likely it is to pass by luck versus with real improvement.
+6. **What this can't tell you.** The data gaps, including which recording habit
+   would close each one.
 
 ## Testing
 
 New `test-debrief-facts.js`, covering:
 
-- The ledger identity: the two parts sum to strokes over par on every hole and in
-  total.
-- Coverage counts and par-3-by-club tables match a hand-built fixture.
-- Both engines load in one process and neither's functions interfere with the
-  other's.
-- Named course metrics over a date window, including the empty-window case.
-- Criterion evaluation returns `insufficient-data` below the exposure threshold.
-- Priority record shape, the same-day update-in-place rule, and that
-  `lastRecommendation` on both pages' source lists returns an `overall` record.
-- The existing `test-course-engine.js` parity tests still pass after the re-mirror.
+- Both engines load in one process with no interference, including reading a
+  top-level `const`.
+- Each comparison in "Where strokes go" against a hand-built fixture.
+- Putts above expectation per round.
+- Criterion thresholds and pass probabilities. A seeded random generator keeps
+  these deterministic.
+- 9-hole rounds are normalised per hole.
+- Short or empty windows return insufficient-data.
+- Priority record shape and the same-day update-in-place rule.
+
+The `range.html` page edits are UI code outside the engine block. Verify them in a
+browser: a `'round'` priority shows in the form and the history table, and blocks
+logging a second one.
+
+The three existing engine suites must still pass.
 
 ## Out of scope
 
-- Shot-level or approach data from the course (no export exists).
+- Shot-level or approach data from the course.
 - A new page, or any model call from the app.
-- Cross-domain digests inside the existing app prompts, and retiring them.
+- Cross-domain data inside the existing Copy-prompt buttons, and retiring them.
   Both are later decisions.
 - The schematic diagram, and any change to how swings are measured.
 
 ## Open questions
 
-- Whether Grint's **Shots** view records per-shot club and distance is unknown. If
-  it ever yields reliable data, the ledger could be split further. This design does
-  not depend on it.
-- Criterion windows depend on exposure (roughly five par 3s per 18 holes), so they
-  are set per priority in the debrief rather than by a fixed rule.
+- Whether Grint's **Shots** view records per-shot club and distance is unknown.
+  This design does not depend on it.
+- Whether the debrief text itself should be kept anywhere, or only the priority.
+  First version: only the priority.
+
+## Review record
+
+An independent review (Opus, fresh context, no access to the design conversation)
+returned **"right approach, change X."** Every load-bearing number it cited was
+re-verified against the data before being accepted.
+
+**Accepted:**
+- Replace the ledger with within-player comparisons.
+- Correct the driver account: mixed evidence, not refuted, and a smaller lever.
+- Correct the coverage figures, which had counted short, long and severe as
+  "direction."
+- Reject the par-3 count test.
+- Allow labelled range-originated priorities where the course can't see the
+  problem.
+- Lighter cadence.
+- Reuse the `'round'` source instead of adding `overall`.
+- Drop the `course.html` re-mirror (`REC_SOURCES` is never read).
+- Read top-level `const` with `runInContext`.
+
+**Changed from the review:** its proposed test, "beat your recent median in 2 of
+the next 3 rounds," passes 50% of the time with no change. It was replaced by a
+window average against a threshold derived from the recent spread.
+
+**Added after the review:**
+- The putting finding was re-checked against greens hit (still about 8.5 per
+  round, above expectation in 28 of 28 rounds).
+- The user confirmed putts are counted on the green only.
+- Long first putts suggest a proximity component within putting.
+- `range.html` line 1517 also filters out round priorities.
+- The range prompt's continuity line (1495) is deliberately left alone.
