@@ -1358,7 +1358,7 @@ function doAddRec() {
   if (!priority || !criterion) { rm('Both a priority and a success criterion are required.'); return; }
 
   let recs = loadRecs();
-  const pending = lastRecommendation(recs, ['range', 'video']);
+  const pending = lastRecommendation(recs, ['range', 'video', 'round']);
   const today = new Date().toISOString().slice(0, 10);
   // recKey is date+source. Closing pending and logging a new one for the SAME
   // source on the SAME calendar day would produce two records with an
@@ -1374,7 +1374,7 @@ function doAddRec() {
   if (pending) {
     const sel = document.getElementById('recOutcome');
     if (!sel) { rm('Could not read the outcome of the open priority.'); return; }
-    recs = closePending(recs, ['range', 'video'], sel.value, null, today);
+    recs = closePending(recs, ['range', 'video', 'round'], sel.value, null, today);
   }
   recs = mergeRecommendations(recs, [{
     date: today, source, priority, criterion,
@@ -1500,7 +1500,7 @@ function render() {
   // answerable, and asking here is free because the user has just read the
   // debrief that tells them.
   const recs = loadRecs();
-  const pending = lastRecommendation(recs, ['range', 'video']);
+  const pending = lastRecommendation(recs, ['range', 'video', 'round']);
   document.getElementById('closeOut').innerHTML = pending
     ? `<div class="note warn"><span class="dot"></span><span class="txt">
          <b>Open priority from ${esc(pending.date)}:</b> ${esc(pending.priority)}
@@ -1514,7 +1514,7 @@ function render() {
        </span></div>`
     : '';
 
-  recRows = recs.filter(r => r.source !== 'round').slice().reverse();
+  recRows = recs.slice().reverse();
   const recHistHtml = recRows.map((r, i) => `<tr>
     <td>${esc(r.date)}</td>
     <td>${esc(r.source)}</td>
