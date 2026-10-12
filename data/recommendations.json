@@ -1,1 +1,20 @@
-[]
+[
+ {
+  "date": "2026-10-12",
+  "source": "round",
+  "priority": "Lag-putting ladder: balls at 30, 40 and 50 ft, 10 putts from each, count how many finish within 3 ft past the hole, then hole out. Twice a week for about 15 minutes, plus 5 minutes before each round.",
+  "criterion": "Putts above expectation (given greens hit) at or below 5 per 18 holes over the next 54 holes.",
+  "outcome": "pending",
+  "outcomeNote": null,
+  "outcomeDate": null,
+  "test": {
+   "metric": "putts-vs-expected",
+   "threshold": 5,
+   "windowHoles": 54,
+   "since": "2026-10-12",
+   "falsePass": 0.09,
+   "passIfImproved": 0.51,
+   "improvementPer18": 3
+  }
+ }
+]
